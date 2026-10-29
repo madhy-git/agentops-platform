@@ -1,6 +1,7 @@
 """Typed triage agent (PydanticAI) with tool calling and a deterministic offline model for CI."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -25,6 +26,7 @@ class TriageResult(BaseModel):
     summary: str = Field(max_length=300)
     recommended_action: Literal["answer", "escalate", "refund_review", "freeze_card", "hardship_review"]
     needs_human: bool
+    confidence: float = Field(ge=0.0, le=1.0, description="Model's own confidence in the category, 0-1")
     citations: list[str] = Field(default_factory=list)
 
 
@@ -40,7 +42,9 @@ def build_agent(model) -> Agent[Deps, TriageResult]:
         output_type=TriageResult,
         instructions=(
             "You triage banking customer messages. Use search_policy to ground decisions and cite policy ids. "
-            "Anything involving hardship, fraud, disputes over 500 dollars or vulnerable customers needs a human."
+            "If the message mentions a case id like C-1234, call lookup_case. "
+            "Anything involving hardship, fraud, disputes over 500 dollars or vulnerable customers needs a human. "
+            "Set confidence to how sure you are of the category."
         ),
     )
 
@@ -65,29 +69,33 @@ _RULES = (
 )
 
 
+_CASE_ID = re.compile(r"\bC-\d{4}\b")
+
+
 def offline_model() -> FunctionModel:
     """Deterministic stand-in for an LLM so tests and evals run with no API keys.
     It still exercises the real tool-calling and structured-output path."""
 
     def fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        returned = {p.tool_name for m in messages for p in m.parts if isinstance(p, ToolReturnPart)}
+        returns = {p.tool_name: p.content for m in messages for p in m.parts if isinstance(p, ToolReturnPart)}
         user = next(p.content for m in messages for p in m.parts if isinstance(p, UserPromptPart))
         text = user if isinstance(user, str) else str(user)
-        if "search_policy" not in returned:
+        if "search_policy" not in returns:
             return ModelResponse(parts=[ToolCallPart("search_policy", {"query": text})])
+        case_id = _CASE_ID.search(text)
+        if case_id and "lookup_case" not in returns:
+            return ModelResponse(parts=[ToolCallPart("lookup_case", {"case_id": case_id.group()})])
         low = text.lower()
-        cat, sev, act, human = "general", "low", "answer", False
+        cat, sev, act, human, conf = "general", "low", "answer", False, 0.7
         for c, words, s, a, h in _RULES:
             if any(w in low for w in words):
-                cat, sev, act, human = c, s, a, h
+                cat, sev, act, human, conf = c, s, a, h, 0.9
                 break
-        cites = []
-        for m in messages:
-            for p in m.parts:
-                if isinstance(p, ToolReturnPart) and p.tool_name == "search_policy":
-                    cites = [r["source"].split()[0] for r in p.content][:2]
+        if returns.get("lookup_case", {}).get("vulnerable"):
+            human, act = True, "escalate" if act == "answer" else act
+        cites = [r["source"].split()[0] for r in returns["search_policy"]][:2]
         out = {"category": cat, "severity": sev, "summary": f"{cat} message triaged as {sev} severity.",
-               "recommended_action": act, "needs_human": human, "citations": cites}
+               "recommended_action": act, "needs_human": human, "confidence": conf, "citations": cites}
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, out)])
 
     return FunctionModel(fn)

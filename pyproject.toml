@@ -7,6 +7,7 @@ dependencies = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic-ai-slim>=1.0", "ope
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "httpx>=0.27"]
+otlp = ["opentelemetry-exporter-otlp-proto-http>=1.25"]
 
 [build-system]
 requires = ["setuptools>=68"]

@@ -31,8 +31,9 @@ def triage(req: TriageRequest):
     return {
         "status": o.status,
         "result": o.result.model_dump() if o.result else None,
-        "model": o.route.model.name if o.route else None,
+        "model": o.model_used.name if o.model_used else None,
         "route_reason": o.route.reason if o.route else None,
+        "failed_models": o.failed_models,
         "redactions": o.redactions,
         "approval_id": o.approval_id,
         "reason": o.reason,
@@ -47,7 +48,8 @@ def pending():
 @app.post("/approvals/{approval_id}/decision")
 def decide(approval_id: int, d: Decision):
     try:
-        return svc.store.decide(approval_id, d.approve, d.reviewer).__dict__
+        appr, effect = svc.decide(approval_id, d.approve, d.reviewer)
+        return {**appr.__dict__, "effect": effect}
     except KeyError:
         raise HTTPException(404, "unknown approval")
     except ValueError as e:
