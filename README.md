@@ -1,31 +1,91 @@
 # AgentOps Platform
 
-A tested reference implementation of the operational layer around an AI agent in a regulated setting: triaging customer messages and assisting staff at **Wattle Bank**, a fictional Australian bank. The agent is the easy part. This repo is about running it safely: what goes in, which model runs, what the rules allow, who approves, what the agent can touch, how quality is gated, and how it all runs in production.
+A tested reference implementation of the **operational layer around an AI agent** in a regulated setting: triaging customer messages and assisting staff at **Wattle Bank**, a fictional Australian bank.
 
-It's also a **learning project**: every module opens with *LEARNING NOTES*, and progress is tracked in `../LEARNING_TRACKER.md`. All data is synthetic.
+The agent is the easy part. This repo is about running it safely:
 
-- **New here?** Read [docs/STRUCTURE.md](docs/STRUCTURE.md): a map of the code and one request traced end to end.
-- **The plan:** [project.md](project.md) (Phases 0–7). **The reasons:** [docs/adr/](docs/adr/).
+- **What goes in:** PII redaction, plus direct and indirect prompt-injection guards.
+- **Which model runs:** a cost-aware router, fallback to a higher tier, a circuit breaker.
+- **What the rules allow:** deterministic rules decide; the model only recommends.
+- **Who approves:** domain-routed approvals with SLAs and separation of duties.
+- **What the agent can touch:** role-filtered retrieval, and MCP tools that run as the human's role.
+- **How quality is gated:** a 7-metric release gate, a red-team set, judge calibration.
+- **How it runs in production:** tracing, audit, Temporal, CloudFormation and EKS.
+
+It is also a **learning project**. Every module opens with *LEARNING NOTES* (what it does, why it's built that way, which failure it prevents), and progress is tracked outside the repo in [`../LEARNING_TRACKER.md`](../LEARNING_TRACKER.md). All data is synthetic.
+
+| If you want… | Read |
+|---|---|
+| A map of the code, and one request traced end to end | [docs/STRUCTURE.md](docs/STRUCTURE.md) |
+| The plan (business, rules, scenarios, Phases 0–7) | [project.md](project.md) |
+| Why each choice was made | [docs/adr/](docs/adr/) |
+| What changed, release by release | [CHANGELOG.md](CHANGELOG.md) |
+
+---
+
+## The workspace
+
+```text
+agentops-platform/            (workspace folder, not a repo)
+├── agentops-platform/        ← this repo: guardrails, routing, decisions, RAG, evals, workflow, deploy
+├── mcp-case-tools/           ← sibling repo: MCP server with least-privilege case tools
+└── LEARNING_TRACKER.md       ← exercises and progress; only you mark items [x]
+```
+
+## How a request flows
+
+```text
+POST /triage (JWT) ─► redact PII ─► injection check ─► route to the cheapest model tier that can do the job
+                                                     │   (falls back to a higher tier on provider errors; circuit breaker)
+                                                     ▼
+                     PydanticAI agent ─► typed TriageResult   tools: search_policy (role-filtered RAG),
+                                                     │               lookup_case (static or MCP Case Tools)
+                                                     ▼
+                     decision service: rules R1–R7 ─► reason codes, flags, marketing suppression, next-best-action, risk
+                                                     ▼
+                     case opened ─► regulated? ─► approval routed by domain, with an SLA (remind, escalate, never auto-approve)
+                                                     ▼
+                     specialist approves ─► action executes exactly once (idempotency key, crash recovery)
+
+Every step writes an append-only audit event and an OpenTelemetry span, linked by trace_id.
+```
+
+The copilot (`POST /copilot/stream`) is a second path: redact, check for injection, retrieve with the caller's roles, apply a relevance threshold, then stream a cited answer. A question about content the caller can't see is referred to the right specialist queue instead of being answered.
+
+---
 
 ## What's built
 
-| Area | Highlights | Phase |
-|---|---|---|
-| Triage agent | PydanticAI, typed `TriageResult`, tools, cost-aware router, upward fallback, circuit breaker | 0, 4 |
-| Guardrails | PII redaction, direct + indirect injection, measured precision/recall/latency | 0, 3 |
-| Decision service | YAML rules R1–R7, flags with lifetimes, lifecycle, next-best-action, risk model + drift | 1 |
-| Identity-aware RAG | pgvector + full-text + hybrid; entitlement filter inside SQL; leak tests | 2 |
-| Evals | 7-metric release gate, red-team set, judge calibration, set-size, shadow runs, failure capture | 3 |
-| Observability | OpenTelemetry (GenAI conventions) → Jaeger; audit ↔ trace via `trace_id` | 0, 3 |
-| Workflow | Case state machine, domain-routed approvals with SLAs, separation of duties, exactly-once actions | 4 |
-| Identity | JWT (Keycloak verified locally; Cognito on AWS), role-aware API | 4, 6 |
-| Copilot | Streamed (SSE), cited, relevance-thresholded, refers to specialists instead of leaking | 4 |
-| MCP | Agent consumes `../mcp-case-tools` as the human's role | 4 |
-| Durable workflows | Temporal approvals; real-server drill with genuine downtime | 5 |
-| AWS | Nested CloudFormation, EKS + Pod Identity, RDS, Cognito, Bedrock; validated, **not deployed** | 6 |
-| Variants | LangGraph benchmark; OPA/Rego rules with exhaustive parity test | 7 |
+All eight phases of [project.md](project.md) have a minimal working version.
 
-**Status:** 114 tests (unit, contract, integration, replay); ruff and mypy clean; eval gate passing offline.
+| Phase | Area | Built | Checked by running it |
+|---|---|---|---|
+| 0 | Foundation | Postgres, LiteLLM tier aliases, data contracts, versioned prompts, synthetic data generator, offline baseline | Audit table rejects UPDATE/DELETE (trigger); baseline report committed |
+| 1 | Decisioning | YAML rules R1–R7, flags with lifetimes, lifecycle stages, next-best-action, scikit-learn risk model with model card, PSI drift | Lifecycle replay: 17/17 journey steps correct |
+| 2 | Identity-aware RAG | pgvector, full-text and hybrid (RRF) search; entitlement filter inside the SQL; citations | 0 leaks across 9 configurations; comparison table committed |
+| 3 | Evals and observability | 7-metric release gate, red-team set (including indirect injection), judge calibration, set-size experiment, shadow runs, failure capture; OpenTelemetry to Jaeger | A harmful prompt change fails the gate; real traces in Jaeger |
+| 4 | Copilot, auth, workflow | FastAPI with SSE, Streamlit UI, JWT roles (Keycloak and Cognito), session memory, case state machine, approvals with SLAs, exactly-once actions, MCP integration, runbooks, an incident drill | Real Keycloak tokens; a process killed mid-action recovers and applies the action exactly once |
+| 5 | Durable workflows | Temporal approvals and case clocks | Real server: worker killed, SLA expired while it was down, escalated 1 s after restart |
+| 6 | AWS | Nested CloudFormation (network, data, identity, app), EKS with Pod Identity, RDS, Cognito, Bedrock, hardened Kubernetes manifests, deploy/destroy/smoke scripts, OIDC deploy workflow | cfn-lint, Checkov, kubeconform, Trivy, shellcheck all pass. **Not deployed** |
+| 7 | Variants | Same task in PydanticAI and LangGraph; rules in OPA/Rego | Rego and Python agree on all 2,000 test inputs |
+
+**Status:** 114 tests (unit, contract, integration, replay, Temporal); ruff and mypy clean; eval gate passing offline. MCP Case Tools: 8 tests.
+
+### Scenarios from project.md
+
+| Scenario | What it proves | Where |
+|---|---|---|
+| S1 Stolen card | PII redacted, R1 fires, case opened, approval routed to a fraud specialist | `tests/integration/test_pipeline.py`, curl demo below |
+| S2 Hardship | R2, specialist routing, marketing suppressed | `tests/integration/test_decision.py` |
+| S3 Officer asks restricted policy | Restricted chunks never returned; referred to the specialist queue | `test_rag_pg.py`, `test_copilot.py` |
+| S4 Prompt injection | Direct and planted (indirect) injection blocked and logged, no tool call | `tests/unit/test_guardrails.py`, `evals/redteam.yaml` |
+| S5 Release gate | A prompt change that drops escalation recall fails CI | `test_eval_gate.py::test_s5_harmful_change_fails_the_gate` |
+| S6 Lifecycle replay | Flags set and cleared, marketing suppressed and restored | `tests/replay/`, `evals/replay.py` |
+| S7 Approval timeout | Reminder, escalation, never auto-approved, survives restart | `test_workflow.py`, `test_temporal.py`, `evals/temporal_restart_drill.py` |
+| S8 Mid-action crash | No duplicate side effect after a real process kill | `test_workflow.py::test_s8_kill_mid_action_then_recover_exactly_once` |
+| S9 Model outage | Fallback engages; cost impact recorded | `tests/unit/test_resilience.py`, `evals/baseline.py` |
+
+---
 
 ## Quick start
 
@@ -40,7 +100,9 @@ uv run uvicorn agentops.api:create_app --factory --reload    # API on :8000
 uv run streamlit run ui/app.py                               # UI on :8501
 ```
 
-Host port **5433** is deliberate: it avoids a locally installed Postgres on 5432.
+Host port **5433** is deliberate: it avoids a locally installed Postgres on 5432. Everything runs **offline** by default; no API keys needed.
+
+To use MCP Case Tools as the case source: `uv pip install -e ../mcp-case-tools`, then set `AGENTOPS_CASE_SOURCE=mcp`.
 
 ### Try it with curl
 
@@ -65,7 +127,27 @@ curl -s localhost:8000/copilot -H "Authorization: Bearer $TOKEN" -H 'content-typ
 curl -s localhost:8000/audit -H "Authorization: Bearer $MGR"
 ```
 
+### API endpoints
+
+"Staff" means officer, manager, fraud/hardship specialist or disputes officer. Endpoints marked *service-checked* accept any valid token and let the workflow decide (domain routing, separation of duties), so a refusal is an audited 403, not a missing route.
+
+| Method and path | Who | What |
+|---|---|---|
+| `GET /health`, `GET /me` | anyone / any token | Liveness; who the token says you are |
+| `POST /triage` | staff | Run the full pipeline on a customer message |
+| `GET /approvals/mine` | service-checked | Approvals routed to the caller's domain |
+| `POST /approvals/{id}/decision` | service-checked | Approve or reject (domain and separation of duties enforced) |
+| `GET /cases/{id}` | staff, compliance | One case and its state |
+| `POST /cases/{id}/transition` | service-checked | Move a case through the state machine |
+| `POST /customers/{id}/flags/{flag}/clear` | service-checked | Clear a protective flag (only the matching specialist) |
+| `POST /copilot`, `POST /copilot/stream` | staff | Cited answer; the stream variant uses SSE |
+| `GET /audit` | manager, compliance | Append-only audit trail, filterable by `case_id` |
+
+---
+
 ## Optional services
+
+`docker compose -f deploy/docker-compose.yml --profile <name> up -d`
 
 | Profile | Service | Use |
 |---|---|---|
@@ -74,19 +156,37 @@ curl -s localhost:8000/audit -H "Authorization: Bearer $MGR"
 | `temporal` | Temporal dev server (`:7233`, UI `:8233`) | `uv run python evals/temporal_restart_drill.py` |
 | `live` | LiteLLM gateway (`:4000`) | `AGENTOPS_MODE=live` with provider keys in `.env` (see `.env.example`) |
 
-`docker compose -f deploy/docker-compose.yml --profile <name> up -d`
-
 ## Configuration
+
+All settings are read from the environment in one place: `src/agentops/config.py`.
 
 | Variable | Default | Effect |
 |---|---|---|
 | `AGENTOPS_MODE` | `offline` | `live` sends model calls through LiteLLM |
 | `AGENTOPS_DATABASE_URL` | `postgresql://agentops:agentops@localhost:5433/agentops` | Postgres (on AWS: `AGENTOPS_DB_SECRET_ARN` + `AGENTOPS_DB_HOST` instead) |
 | `AGENTOPS_JWKS_URL`, `AGENTOPS_JWT_AUDIENCE`, `AGENTOPS_JWT_ISSUER` | unset / `agentops-api` / unset | RS256 tokens from Keycloak or Cognito; unset = dev HS256 tokens |
-| `AGENTOPS_CASE_SOURCE` | `static` | `mcp` = cases from MCP Case Tools (`uv pip install -e ../mcp-case-tools`) |
+| `AGENTOPS_CASE_SOURCE` | `static` | `mcp` = cases from MCP Case Tools |
 | `AGENTOPS_PROMPT_TRIAGE_MAJOR` | `1` | Feature flag: switch prompt version without a deploy |
 | `AGENTOPS_POLICY_FILE` | `policies/rules.yaml` | Feature flag: trial a new rule set |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | Export traces (Jaeger, Langfuse, ADOT) |
+
+---
+
+## Quality checks
+
+```bash
+uv run ruff check . && uv run ruff format --check .   # lint and format
+uv run mypy                                           # types
+uv run pytest -q                                      # tests (needs Postgres; Temporal tests use a time-skipping server)
+uv run python evals/run_evals.py                      # release gate: exits non-zero if quality drops
+pre-commit run --all-files                            # the same hooks that run on commit
+```
+
+| Workflow | Runs |
+|---|---|
+| [ci.yml](.github/workflows/ci.yml) | Lint, types, tests, eval gate (on every push and PR) |
+| [security.yml](.github/workflows/security.yml) | cfn-lint, Checkov, kubeconform, Docker build, Trivy, CycloneDX SBOM |
+| [deploy.yml](.github/workflows/deploy.yml) | Manual: deploy or destroy on AWS via OIDC, then smoke test |
 
 ## Evals and reports
 
@@ -101,17 +201,74 @@ curl -s localhost:8000/audit -H "Authorization: Bearer $MGR"
 | `evals/set_size.py` | `docs/evals/set-size.md` | How noisy is a small eval set? |
 | `evals/drift_report.py` | `docs/evals/drift.md` | Has the population moved away from training? |
 | `evals/shadow.py` | stdout | What would change if we switched config? |
+| `evals/capture.py` | golden-set candidates | Turn production failures into new eval cases |
 | `evals/oversight.py` | stdout | Are approvers reviewing or rubber-stamping? |
+| `evals/temporal_restart_drill.py` | stdout | Does an SLA survive real worker downtime? |
 | `benchmarks/run.py` | `docs/evals/framework-benchmark.md` | PydanticAI vs LangGraph on the same task |
+
+## Deploying to AWS
+
+The AWS stack is written and validated, but **not deployed**: deploying needs your account and costs money. Read [docs/aws.md](docs/aws.md) first (architecture, cost note, teardown).
+
+```bash
+deploy/aws/deploy.sh dev    # build and push the image, deploy nested CloudFormation, apply k8s manifests
+deploy/aws/smoke.sh dev     # /health answers, and /triage without a token is rejected with 401
+deploy/aws/destroy.sh dev   # tear everything down
+```
+
+---
+
+## Repo layout
+
+```text
+src/agentops/          the application: api, auth, service (pipeline), guardrails, router, agent, copilot, …
+  decision/            rules engine, flags, lifecycle, risk model, drift              (Phase 1)
+  rag/                 corpus, chunking, embeddings, keyword/vector/hybrid search     (Phase 2)
+  workflow/            cases, approvals, exactly-once actions, timers, Temporal        (Phases 4–5)
+  migrations/          numbered SQL, 001–004: the schema's history
+policies/              rules.yaml (live) and rules.rego (OPA variant)
+prompts/               versioned prompts with front matter
+contracts/             committed JSON Schemas for data contracts
+data/                  synthetic data generator and policy corpus
+evals/                 golden sets, red-team, journeys, and every eval script
+benchmarks/            the same task in PydanticAI and LangGraph
+tests/                 unit, contract, integration, replay
+ui/                    Streamlit client
+deploy/                docker-compose, LiteLLM, Keycloak, CloudFormation, Kubernetes, AWS scripts
+docs/                  structure, ADRs, threat model, SLOs, release, observability, runbooks, eval reports
+```
+
+The full folder-by-folder and module-by-module guide is [docs/STRUCTURE.md](docs/STRUCTURE.md).
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [docs/STRUCTURE.md](docs/STRUCTURE.md) | Code map, request trace, "where is…?", database tables, reading order |
+| [docs/adr/](docs/adr/) | ADRs 0001–0010. Two record deviations from project.md: [0005](docs/adr/0005-protective-flags-set-immediately.md) (flags set immediately) and [0009](docs/adr/0009-eks-pod-identity-over-irsa.md) (Pod Identity, not IRSA) |
+| [docs/threat-model.md](docs/threat-model.md) | Threats, controls and accepted risks |
+| [docs/slo.md](docs/slo.md), [docs/observability.md](docs/observability.md) | What's measured, and how to see it |
+| [docs/release.md](docs/release.md) | Versioning, the gate, shadow runs, rollback |
+| [docs/runbooks/](docs/runbooks/) | Model outage, approval backlog, failing eval gate, suspected data leak |
+| [docs/incidents/](docs/incidents/) | Postmortem of the tier-2 outage drill |
+| [docs/model-cards/risk-model.md](docs/model-cards/risk-model.md) | Risk model: data, metrics, limits |
+| [docs/evals/](docs/evals/) | Generated reports (gate, baseline, RAG, guards, judge, drift, set size, benchmark) |
+
+## Learning with this repo
+
+1. Read [docs/STRUCTURE.md](docs/STRUCTURE.md), then follow its reading order.
+2. Open [`../LEARNING_TRACKER.md`](../LEARNING_TRACKER.md). Every item is `[b]` (built by Claude). For each one: read the code, run it, break it, then change it without help. Only then mark it `[x]`.
+3. The tracker's findings sections list the bugs that were found by *running* things (rolled-back audit rows, a fallback hiding a programming error, Rego's `null < 121`). Try to reproduce them.
 
 ## Honest scope
 
-- **Offline by default.** A deterministic rule-based stand-in drives the real agent loop, so CI needs no keys. Offline scores prove pipeline and gating, **not model quality**. No live baseline has been recorded yet (it needs provider credentials).
-- **AWS is written and validated, not deployed.** cfn-lint, Checkov, kubeconform, Trivy and shellcheck all pass; deploying needs your account and costs money ([docs/aws.md](docs/aws.md)).
-- **Not wired:** the API still uses the Postgres timer worker, not Temporal; actions run against an in-repo fake ledger, not MCP's `execute_action`; Langfuse and Ragas aren't set up.
+- **Offline by default.** A deterministic rule-based stand-in drives the real agent loop, so CI needs no keys. Offline scores prove the pipeline and gating, **not model quality**. No live baseline has been recorded yet (it needs provider credentials).
+- **AWS is written and validated, not deployed.**
+- **Built but not wired in:** the API still uses the Postgres timer worker, not Temporal; actions run against an in-repo fake ledger, not MCP's `execute_action`. Langfuse, Ragas and MLflow aren't set up.
+- **Placeholder labels:** the judge-calibration labels were written by Claude, not by a human reviewer.
 - **Synthetic everything.** Wattle Bank, its policies, customers and thresholds are invented. Verify real regulatory obligations before reusing any rule.
 - Accepted risks are listed in [docs/threat-model.md](docs/threat-model.md).
 
 ## Related
 
-[MCP Case Tools](../mcp-case-tools): an MCP server with least-privilege roles, two workflow profiles (regulator, Wattle Bank), idempotency keys and an audit trail.
+[MCP Case Tools](../mcp-case-tools): an MCP server with least-privilege roles, two workflow profiles (regulator, Wattle Bank), idempotency keys and an audit trail. This repo calls it as the human's role, so the agent can never do more than the person using it.
