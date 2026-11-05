@@ -22,7 +22,7 @@ jobs:
       PYDANTIC_AI_NO_BANNER: "1"
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with: { enable-cache: true }
       - run: uv sync --all-extras --locked
       - name: Lint and format check
