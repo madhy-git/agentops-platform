@@ -1,0 +1,44 @@
+# LiteLLM gateway, calling Bedrock with its own Pod Identity role (no API keys anywhere).
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: litellm-config, namespace: agentops }
+data:
+  config.yaml: |
+    # Check Bedrock model ids / inference profiles available in your region before deploying.
+    model_list:
+      - model_name: agentops-tier1
+        litellm_params: { model: "bedrock/${BEDROCK_TIER1}", aws_region_name: "${AWS_REGION}" }
+      - model_name: agentops-tier2
+        litellm_params: { model: "bedrock/${BEDROCK_TIER2}", aws_region_name: "${AWS_REGION}" }
+      - model_name: agentops-tier3
+        litellm_params: { model: "bedrock/${BEDROCK_TIER3}", aws_region_name: "${AWS_REGION}" }
+    litellm_settings: { drop_params: true, request_timeout: 30 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: litellm, namespace: agentops, labels: { app: litellm } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: litellm } }
+  template:
+    metadata: { labels: { app: litellm } }
+    spec:
+      serviceAccountName: agentops-litellm
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-stable
+          args: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
+          ports: [{ containerPort: 4000 }]
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }
+          volumeMounts: [{ name: config, mountPath: /etc/litellm }]
+      volumes: [{ name: config, configMap: { name: litellm-config } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: litellm, namespace: agentops }
+spec:
+  selector: { app: litellm }
+  ports: [{ port: 4000, targetPort: 4000 }]

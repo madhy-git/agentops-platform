@@ -1,0 +1,30 @@
+# Runs on every `git commit` once installed: `uv run pre-commit install`.
+# LEARNING NOTE: pre-commit catches cheap problems (format, lint, secrets) before they reach CI,
+# where they cost a full pipeline run. CI still runs the same checks: hooks can be skipped.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3   # keep in step with the ruff version in uv.lock
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        args: [--unsafe]   # CloudFormation uses custom tags like !Ref
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: detect-private-key
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+        types: [python]

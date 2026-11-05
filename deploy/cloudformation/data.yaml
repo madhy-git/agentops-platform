@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AgentOps data: RDS Postgres 17 (pgvector is a supported extension on RDS) with an AWS-managed master
+  password in Secrets Manager, encryption at rest and backups.
+# LEARNING NOTES
+# - ManageMasterUserPassword: RDS creates and rotates the password in Secrets Manager. No password ever
+#   appears in this template, a parameter, CI logs or the app's environment.
+# - The DB security group only accepts connections from the EKS cluster security group.
+# - Multi-AZ and deletion protection are parameters: off for a cheap demo, on for anything real.
+
+Parameters:
+  Env: { Type: String, Default: demo }
+  VpcId: { Type: AWS::EC2::VPC::Id }
+  PrivateSubnets: { Type: List<AWS::EC2::Subnet::Id> }
+  AppSecurityGroupId: { Type: AWS::EC2::SecurityGroup::Id, Description: EKS cluster security group }
+  InstanceClass: { Type: String, Default: db.t4g.micro }
+  # A full minor version: RDS won't create new instances from a bare major ("17"). Taken from cfn-lint's
+  # current AWS data; check `aws rds describe-db-engine-versions --engine postgres` before deploying.
+  EngineVersion: { Type: String, Default: "17.11" }
+  MultiAz: { Type: String, AllowedValues: ["true", "false"], Default: "false" }
+  DeletionProtection: { Type: String, AllowedValues: ["true", "false"], Default: "false" }
+
+Resources:
+  DbSubnets:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub agentops-${Env} private subnets
+      SubnetIds: !Ref PrivateSubnets
+  DbSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Postgres from the EKS cluster only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref AppSecurityGroupId, Description: EKS pods }
+      SecurityGroupEgress: [{ IpProtocol: "-1", CidrIp: 127.0.0.1/32, Description: no egress needed }]
+  DbKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub agentops-${Env} RDS encryption
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - { Sid: RootAdmin, Effect: Allow, Principal: { AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root" }, Action: "kms:*", Resource: "*" }
+  MonitoringRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [{ Effect: Allow, Principal: { Service: monitoring.rds.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns: [!Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"]
+  Db:
+    Type: AWS::RDS::DBInstance
+    # Multi-AZ is a parameter (default off) to keep a demo cheap. Recorded as an accepted risk, not ignored:
+    # checkov:skip=CKV_AWS_157:Demo default; set MultiAz=true for any non-demo environment (docs/aws.md)
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: postgres
+      EngineVersion: !Ref EngineVersion
+      DBInstanceClass: !Ref InstanceClass
+      AllocatedStorage: "20"
+      StorageType: gp3
+      StorageEncrypted: true
+      KmsKeyId: !Ref DbKey
+      DBName: agentops
+      MasterUsername: agentops
+      ManageMasterUserPassword: true
+      DBSubnetGroupName: !Ref DbSubnets
+      VPCSecurityGroups: [!Ref DbSg]
+      PubliclyAccessible: false
+      MultiAZ: !Ref MultiAz
+      DeletionProtection: !Ref DeletionProtection
+      BackupRetentionPeriod: 7
+      AutoMinorVersionUpgrade: true
+      EnableIAMDatabaseAuthentication: true
+      EnablePerformanceInsights: true
+      PerformanceInsightsKMSKeyId: !Ref DbKey
+      CopyTagsToSnapshot: true
+      EnableCloudwatchLogsExports: [postgresql]
+      MonitoringInterval: 60
+      MonitoringRoleArn: !GetAtt MonitoringRole.Arn
+
+Outputs:
+  DbEndpoint: { Value: !GetAtt Db.Endpoint.Address }
+  DbSecretArn: { Value: !GetAtt Db.MasterUserSecret.SecretArn }

@@ -1,0 +1,37 @@
+# Manual deploy to AWS. Never runs on push: deploying costs money and needs a human to press the button.
+# LEARNING NOTES
+# - OIDC federation: GitHub proves "I am workflow X in repo Y" to AWS, and AWS hands back short-lived
+#   credentials for one role. No AWS access keys are stored in GitHub, so there's nothing to leak or rotate.
+# - The role's trust policy should restrict `token.actions.githubusercontent.com:sub` to this repo and the
+#   `production` environment, so other repos and branches can't assume it.
+# - `environment: production` lets you require a reviewer's approval before the job starts.
+name: deploy
+on:
+  workflow_dispatch:
+    inputs:
+      action: { type: choice, options: [deploy, destroy], default: deploy }
+      env: { type: string, default: demo }
+permissions: { id-token: write, contents: read }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: ${{ inputs.action }}
+        run: deploy/aws/${{ inputs.action }}.sh "${{ inputs.env }}"
+        env:
+          DEPLOYER_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          BEDROCK_MODEL_ARNS: ${{ vars.BEDROCK_MODEL_ARNS }}
+          BEDROCK_TIER1: ${{ vars.BEDROCK_TIER1 }}
+          BEDROCK_TIER2: ${{ vars.BEDROCK_TIER2 }}
+          BEDROCK_TIER3: ${{ vars.BEDROCK_TIER3 }}
+          CERT_ARN: ${{ vars.CERT_ARN }}
+      - name: Smoke test
+        if: inputs.action == 'deploy'
+        run: deploy/aws/smoke.sh "${{ inputs.env }}"

@@ -1,0 +1,21 @@
+# Timer worker (Phase 4 naive SLAs + crash recovery on start-up). One replica is enough: tick() is
+# idempotent and uses SKIP LOCKED, so two replicas would also be safe.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: agentops-worker, namespace: agentops, labels: { app: agentops-worker } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: agentops-worker } }
+  template:
+    metadata: { labels: { app: agentops-worker } }
+    spec:
+      serviceAccountName: agentops-worker
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: worker
+          image: "${IMAGE}"
+          args: ["python", "-m", "agentops.workflow.timers"]
+          envFrom: [{ configMapRef: { name: agentops-config } }]
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } }

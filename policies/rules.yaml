@@ -1,0 +1,90 @@
+# Decision rules for Wattle Bank (fictional). Read by src/agentops/decision/rules.py.
+#
+# LEARNING NOTES
+# - Business rules live here, not in prompts and not in Python if-statements. A compliance
+#   reviewer can read this file, and every decision records `version` so you can answer
+#   "which rules were live when this customer was handled?".
+# - Bump `version` on ANY change. tests/unit/test_rules.py fails if the content changes without it.
+# - `when` conditions are matched against a context dict built by DecisionService:
+#     category, role, regulated_action, txn_age_days, risk_score, flags (list), lifecycle_stage
+#   Operators: plain value (equals), {in: [...]}, {gt: n}, {lt: n},
+#              {contains: x}, {contains_any: [...]}, {not_contains: x}
+# - Every matching rule fires (not first-match-wins), so outcomes compose: a fraud complaint from a
+#   high-risk customer gets R1, R4 and R6 together.
+# - Rules run in file order and each one sees the effects of the rules before it. That is why R5
+#   (approval) comes after R1-R4 (which add actions) and R7 (suppression) comes after the rules that
+#   set flags: a fraud report suppresses marketing in the *same* decision, not the next one.
+# - When several rules set a queue, the highest priority wins.
+
+version: "2026.11.1"
+
+# Actions that change a customer's position. Requesting one as an officer needs approval (R5).
+regulated_actions: [block_card, hardship_review, refund_review, compensation, hardship_arrangement]
+
+# Map the agent's recommendation (TriageResult.recommended_action) to a decision action.
+action_map:
+  freeze_card: block_card
+  hardship_review: hardship_review
+  refund_review: refund_review
+  escalate: escalate
+  answer: answer
+
+rules:
+  - id: R1
+    reason_code: FRAUD_SUSPECTED
+    when: { category: fraud }
+    then: { queue: fraud, priority: urgent, actions: [block_card], set_flags: [fraud_flag] }
+
+  - id: R2
+    reason_code: HARDSHIP_CUE
+    when: { category: hardship }
+    then: { queue: hardship_specialist, priority: high, actions: [hardship_review, hold_collections], set_flags: [hardship_flag] }
+
+  - id: R3
+    reason_code: DISPUTE_OUT_OF_WINDOW
+    when: { category: dispute, txn_age_days: { gt: 120 } }
+    then: { queue: disputes_officer, priority: normal, actions: [manual_review], block_actions: [refund_review] }
+
+  - id: R3b
+    reason_code: DISPUTE_IN_WINDOW
+    when: { category: dispute, txn_age_days: { lt: 121 } }
+    then: { queue: disputes, priority: normal, actions: [refund_review] }
+
+  - id: R4
+    reason_code: COMPLAINT_CLOCK
+    when: { category: complaint }
+    then: { queue: complaints, priority: high, actions: [start_complaint_clock], set_flags: [complaint_open] }
+
+  - id: R5
+    reason_code: NEEDS_APPROVAL
+    when: { role: officer, regulated_action: true }
+    then: { requires_approval: true }
+
+  - id: R6
+    reason_code: RISK_HIGH
+    when: { risk_score: { gt: 0.5 }, flags: { not_contains: hardship_flag } }
+    then: { rank_first: [support, retention] }
+
+  - id: R7
+    reason_code: MARKETING_SUPPRESSED
+    # `cooling_off` is a pseudo-flag DecisionService adds for 30 days after the last real flag clears.
+    when: { flags: { contains_any: [fraud_flag, hardship_flag, complaint_open, cooling_off] } }
+    then: { suppress_kinds: [marketing] }
+
+# Who may clear each flag (project.md "Customer flags" table). "system" = automated close-out.
+flags:
+  fraud_flag: { cleared_by: [fraud_specialist, manager] }
+  hardship_flag: { cleared_by: [hardship_specialist, manager] }
+  complaint_open: { cleared_by: [system, manager] }
+
+# Marketing stays suppressed this long after the last flag clears (Resolution -> cooling-off).
+cooling_off_days: 30
+
+# Next-best-action candidates (UC7). value/risk are illustrative 0-1 scores.
+offers:
+  - { id: credit_limit_increase, kind: marketing, value: 0.8, risk: 0.5, adds_debt: true }
+  - { id: home_loan_refinance, kind: marketing, value: 0.7, risk: 0.3, adds_debt: true }
+  - { id: savings_bonus_rate, kind: marketing, value: 0.5, risk: 0.1, adds_debt: false }
+  - { id: retention_fee_waiver, kind: retention, value: 0.4, risk: 0.1, adds_debt: false }
+  - { id: proactive_support_call, kind: support, value: 0.3, risk: 0.0, adds_debt: false }
+  - { id: budgeting_tools, kind: support, value: 0.2, risk: 0.0, adds_debt: false }

@@ -1,0 +1,32 @@
+# LEARNING NOTE: default-deny, then allow only the paths the architecture needs. A compromised LiteLLM pod
+# can't reach the database; only the API takes traffic from the ALB. (Needs a CNI that enforces
+# NetworkPolicy: enable it on the VPC CNI add-on.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny-ingress, namespace: agentops }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: api-from-alb, namespace: agentops }
+spec:
+  podSelector: { matchLabels: { app: agentops-api } }
+  ingress: [{ ports: [{ port: 8000 }] }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: litellm-from-api, namespace: agentops }
+spec:
+  podSelector: { matchLabels: { app: litellm } }
+  ingress: [{ from: [{ podSelector: { matchLabels: { app: agentops-api } } }], ports: [{ port: 4000 }] }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: adot-from-app, namespace: agentops }
+spec:
+  podSelector: { matchLabels: { app: adot-collector } }
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app: agentops-api } } }, { podSelector: { matchLabels: { app: agentops-worker } } }]
+      ports: [{ port: 4318 }]

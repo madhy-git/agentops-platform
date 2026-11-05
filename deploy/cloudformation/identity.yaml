@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AgentOps identity: Cognito user pool (staff sign-in, groups = app roles) and one least-privilege IAM role
+  per service, bound to Kubernetes service accounts with EKS Pod Identity.
+# LEARNING NOTES
+# - One role per service. The API can invoke Bedrock and read the DB secret; the timer worker can only
+#   read the DB secret; the ADOT collector can only write traces/metrics. A bug in one can't use another's
+#   permissions. tests/unit/test_iam_least_privilege.py checks these policies.
+# - The trust policy is repeated per role on purpose: CloudFormation rejects YAML anchors/aliases.
+# - Pod Identity (not IRSA): see docs/adr/0009. The trust principal is pods.eks.amazonaws.com and the binding
+#   is an AWS::EKS::PodIdentityAssociation (namespace + service account -> role).
+# - Bedrock access is limited to specific model ARNs passed in as a parameter. Check model ids and regional
+#   availability (or inference-profile ARNs) for your account before deploying.
+
+Parameters:
+  Env: { Type: String, Default: demo }
+  ClusterName: { Type: String }
+  DbSecretArn: { Type: String }
+  BedrockModelArns: { Type: CommaDelimitedList, Description: Exact model or inference-profile ARNs the API may invoke }
+  Namespace: { Type: String, Default: agentops }
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub agentops-${Env}
+      AdminCreateUserConfig: { AllowAdminCreateUserOnly: true }   # staff only; no self sign-up
+      MfaConfiguration: "OPTIONAL"
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      Policies:
+        PasswordPolicy: { MinimumLength: 14, RequireLowercase: true, RequireUppercase: true, RequireNumbers: true, RequireSymbols: true }
+      UserPoolAddOns: { AdvancedSecurityMode: ENFORCED }
+  AppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: agentops-api
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]   # authorization code + PKCE; no implicit flow, no password grant
+      AllowedOAuthScopes: [openid, email, profile]
+      CallbackURLs: ["https://localhost/callback"]
+      SupportedIdentityProviders: [COGNITO]
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      TokenValidityUnits: { AccessToken: hours, IdToken: hours }
+  # Groups = app roles (agentops.auth.APP_ROLES). Cognito puts them in the `cognito:groups` claim.
+  GroupOfficer: { Type: AWS::Cognito::UserPoolGroup, Properties: { UserPoolId: !Ref UserPool, GroupName: officer } }
+  GroupManager: { Type: AWS::Cognito::UserPoolGroup, Properties: { UserPoolId: !Ref UserPool, GroupName: manager } }
+  GroupCompliance: { Type: AWS::Cognito::UserPoolGroup, Properties: { UserPoolId: !Ref UserPool, GroupName: compliance } }
+  GroupFraud: { Type: AWS::Cognito::UserPoolGroup, Properties: { UserPoolId: !Ref UserPool, GroupName: fraud_specialist } }
+  GroupHardship: { Type: AWS::Cognito::UserPoolGroup, Properties: { UserPoolId: !Ref UserPool, GroupName: hardship_specialist } }
+  GroupDisputes: { Type: AWS::Cognito::UserPoolGroup, Properties: { UserPoolId: !Ref UserPool, GroupName: disputes_officer } }
+
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: pods.eks.amazonaws.com }
+            Action: [sts:AssumeRole, sts:TagSession]
+      Policies:
+        - PolicyName: bedrock-and-db-secret
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Sid: InvokeApprovedModels, Effect: Allow, Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream], Resource: !Ref BedrockModelArns }
+              - { Sid: ReadDbSecret, Effect: Allow, Action: secretsmanager:GetSecretValue, Resource: !Ref DbSecretArn }
+  WorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: pods.eks.amazonaws.com }
+            Action: [sts:AssumeRole, sts:TagSession]
+      Policies:
+        - PolicyName: db-secret-only
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Sid: ReadDbSecret, Effect: Allow, Action: secretsmanager:GetSecretValue, Resource: !Ref DbSecretArn }
+  LitellmRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: pods.eks.amazonaws.com }
+            Action: [sts:AssumeRole, sts:TagSession]
+      Policies:
+        - PolicyName: bedrock-only
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Sid: InvokeApprovedModels, Effect: Allow, Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream], Resource: !Ref BedrockModelArns }
+  AdotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: pods.eks.amazonaws.com }
+            Action: [sts:AssumeRole, sts:TagSession]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AWSXrayWriteOnlyAccess"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
+
+  ApiBinding:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties: { ClusterName: !Ref ClusterName, Namespace: !Ref Namespace, ServiceAccount: agentops-api, RoleArn: !GetAtt ApiRole.Arn }
+  WorkerBinding:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties: { ClusterName: !Ref ClusterName, Namespace: !Ref Namespace, ServiceAccount: agentops-worker, RoleArn: !GetAtt WorkerRole.Arn }
+  LitellmBinding:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties: { ClusterName: !Ref ClusterName, Namespace: !Ref Namespace, ServiceAccount: agentops-litellm, RoleArn: !GetAtt LitellmRole.Arn }
+  AdotBinding:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties: { ClusterName: !Ref ClusterName, Namespace: !Ref Namespace, ServiceAccount: adot-collector, RoleArn: !GetAtt AdotRole.Arn }
+
+Outputs:
+  UserPoolId: { Value: !Ref UserPool }
+  AppClientId: { Value: !Ref AppClient }
+  JwksUrl: { Value: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}/.well-known/jwks.json" }

@@ -1,13 +1,39 @@
 [project]
 name = "agentops-platform"
-version = "0.1.0"
+version = "0.2.0"
 description = "Production-style AI agent service: model routing, guardrails, HITL approvals, evals and tracing"
 requires-python = ">=3.11"
-dependencies = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic-ai-slim>=1.0", "opentelemetry-sdk>=1.25"]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic-ai-slim[openai]>=1.0",
+    "opentelemetry-sdk>=1.25",
+    "pyyaml>=6",
+    "psycopg[binary]>=3.2",
+    "scikit-learn>=1.5",
+    "fastembed>=0.4",
+    "pgvector>=0.3",
+    "pyjwt[crypto]>=2.9",
+    "sse-starlette>=2.1",
+    "temporalio>=1.8",
+]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27"]
 otlp = ["opentelemetry-exporter-otlp-proto-http>=1.25"]
+ui = ["streamlit>=1.38", "httpx>=0.27"]
+aws = ["boto3>=1.35"]
+bench = ["langgraph>=0.2", "langchain-core>=0.3", "langchain-openai>=0.2"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pre-commit>=3.8",
+    "types-PyYAML",
+    "pytest-asyncio>=0.24",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -17,4 +43,32 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]  # "." so tests can import benchmarks/
+markers = ["postgres: needs a running Postgres (AGENTOPS_DATABASE_URL)"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]  # the formatter owns line length; long SQL/strings are fine
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends(...) in argument defaults is the framework's idiom, not a mutable-default bug.
+extend-immutable-calls = ["fastapi.Depends", "agentops.auth.require"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+strict_optional = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.setuptools.package-data]
+agentops = ["migrations/*.sql"]
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*", "mcp_case_tools.*", "fastembed.*", "pgvector.*", "boto3.*"]
+ignore_missing_imports = true   # these packages ship no type stubs

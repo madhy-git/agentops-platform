@@ -1,0 +1,170 @@
+{
+  "realm": "wattle",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "officer"
+      },
+      {
+        "name": "manager"
+      },
+      {
+        "name": "compliance"
+      },
+      {
+        "name": "viewer"
+      },
+      {
+        "name": "fraud_specialist"
+      },
+      {
+        "name": "hardship_specialist"
+      },
+      {
+        "name": "disputes_officer"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "agentops-api",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": [
+        "http://localhost:8501/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "protocolMappers": [
+        {
+          "name": "audience-agentops-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "agentops-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "officer-1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "officer-1",
+      "lastName": "Demo",
+      "email": "officer-1@wattle.example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "officer"
+      ]
+    },
+    {
+      "username": "fraud-1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "fraud-1",
+      "lastName": "Demo",
+      "email": "fraud-1@wattle.example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "officer",
+        "fraud_specialist"
+      ]
+    },
+    {
+      "username": "hardship-1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "hardship-1",
+      "lastName": "Demo",
+      "email": "hardship-1@wattle.example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "officer",
+        "hardship_specialist"
+      ]
+    },
+    {
+      "username": "disputes-1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "disputes-1",
+      "lastName": "Demo",
+      "email": "disputes-1@wattle.example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "officer",
+        "disputes_officer"
+      ]
+    },
+    {
+      "username": "manager-1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "manager-1",
+      "lastName": "Demo",
+      "email": "manager-1@wattle.example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "manager"
+      ]
+    },
+    {
+      "username": "compliance-1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "compliance-1",
+      "lastName": "Demo",
+      "email": "compliance-1@wattle.example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "viewer",
+        "compliance"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+# Supply chain and infrastructure checks on every push.
+# LEARNING NOTE: each tool answers one question. cfn-lint: "is the template valid?"; Checkov: "is it
+# insecure?"; kubeconform: "are the manifests valid Kubernetes?"; Trivy: "does the image ship known CVEs?";
+# gitleaks: "did someone commit a secret?". The SBOM records exactly what's in the image, for later audits.
+name: security
+on: [push, pull_request]
+permissions: { contents: read }
+
+jobs:
+  iac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install cfn-lint checkov
+      - name: cfn-lint
+        run: cfn-lint deploy/cloudformation/*.yaml --ignore-checks W3002   # W3002: nested TemplateURLs are packaged at deploy
+      - name: Checkov
+        run: checkov -d deploy/cloudformation --framework cloudformation --compact --quiet
+      - name: kubeconform
+        run: docker run --rm -v "$PWD/deploy/k8s:/m:ro" ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary /m
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t agentops:${{ github.sha }} .
+      - name: Trivy (fail on fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with: { image-ref: "agentops:${{ github.sha }}", severity: "HIGH,CRITICAL", ignore-unfixed: true, exit-code: "1" }
+      - name: SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@0.28.0
+        with: { image-ref: "agentops:${{ github.sha }}", format: cyclonedx, output: sbom.cdx.json }
+      - uses: actions/upload-artifact@v4
+        with: { name: sbom, path: sbom.cdx.json }
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }

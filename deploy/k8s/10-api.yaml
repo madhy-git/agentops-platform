@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: agentops-api, namespace: agentops, labels: { app: agentops-api } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: agentops-api } }
+  template:
+    metadata: { labels: { app: agentops-api } }
+    spec:
+      serviceAccountName: agentops-api
+      automountServiceAccountToken: false   # the app never talks to the Kubernetes API
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: api
+          image: "${IMAGE}"
+          args: ["uvicorn", "agentops.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+          ports: [{ containerPort: 8000 }]
+          envFrom: [{ configMapRef: { name: agentops-config } }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 250m, memory: 768Mi }   # embedding model ~300 MB in memory
+            limits: { memory: 1536Mi }
+          readinessProbe: { httpGet: { path: /health, port: 8000 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /health, port: 8000 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }   # the only writable path; the embedding model is baked into the image
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: agentops-api, namespace: agentops }
+spec:
+  selector: { app: agentops-api }
+  ports: [{ port: 80, targetPort: 8000 }]
+---
+# ALB via the AWS Load Balancer Controller (installed by deploy/aws/deploy.sh). TLS terminates at the ALB.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agentops-api
+  namespace: agentops
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: "${CERT_ARN}"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: agentops-api, port: { number: 80 } } } }

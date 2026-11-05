@@ -1,5 +1,5 @@
 from agentops.agent import Deps, build_agent, offline_model
-from agentops.rag import KeywordRetriever
+from agentops.rag.memory import KeywordRetriever
 
 
 def run(text: str):

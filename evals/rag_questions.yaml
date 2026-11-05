@@ -1,0 +1,34 @@
+# Retrieval eval set: question -> the document(s) that answer it, asked as a given role.
+# LEARNING NOTE: "style: paraphrase" questions share few or no words with the answer document.
+# That's where keyword search should lose and vector/hybrid should win. If it doesn't, find out why.
+questions:
+  - { q: "How much is the foreign transaction fee?", roles: [officer], relevant: [POL-FAQ-01], style: keyword }
+  - { q: "How can a customer get old statements?", roles: [officer], relevant: [POL-FAQ-01], style: keyword }
+  - { q: "How is credit card interest calculated?", roles: [officer], relevant: [POL-FAQ-01], style: keyword }
+  - { q: "What do I do when a card is stolen?", roles: [officer], relevant: [POL-FRAUD-01, POL-FAQ-01], style: keyword }
+  - { q: "Can I ask the customer for their PIN to verify them?", roles: [officer], relevant: [POL-FRAUD-01], style: keyword }
+  - { q: "Customer was tricked into sending money to someone", roles: [officer], relevant: [POL-FRAUD-01], style: paraphrase }
+  - { q: "A caller pretended to be from the bank", roles: [officer], relevant: [POL-FRAUD-01], style: paraphrase }
+  - { q: "How long does a customer have to lodge a chargeback?", roles: [officer], relevant: [POL-DISP-01], style: keyword }
+  - { q: "Shop never sent the goods, what can we do?", roles: [officer], relevant: [POL-DISP-01], style: paraphrase }
+  - { q: "Customer paid twice for one purchase", roles: [officer], relevant: [POL-DISP-01], style: paraphrase }
+  - { q: "When do refunds need someone to sign off?", roles: [officer], relevant: [POL-DISP-01], style: paraphrase }
+  - { q: "Why are card refunds slow this week?", roles: [officer], relevant: [POL-VEND-01], style: paraphrase }
+  - { q: "What repayment pause options are there?", roles: [hardship_specialist], relevant: [POL-HARD-01], style: keyword }
+  - { q: "Customer's husband died and they can't keep up with payments", roles: [hardship_specialist], relevant: [POL-HARD-01], style: paraphrase }
+  - { q: "Can we offer a limit increase to someone in hardship?", roles: [hardship_specialist], relevant: [POL-HARD-01], style: keyword }
+  - { q: "How much goodwill compensation can a team leader approve?", roles: [manager], relevant: [POL-COMP-01], style: keyword }
+  - { q: "Customer threatened to go to the ombudsman", roles: [manager], relevant: [POL-COMP-01], style: keyword }
+  - { q: "How quickly must we respond to an unhappy customer?", roles: [manager], relevant: [POL-COMP-01], style: paraphrase }
+  - { q: "What triggers a velocity soft block?", roles: [fraud_specialist], relevant: [POL-FRAUD-02], style: keyword }
+  - { q: "Signs an account is being used to move stolen money", roles: [fraud_specialist], relevant: [POL-FRAUD-02], style: paraphrase }
+
+# Leak probes: questions that *would* retrieve a restricted document, asked by roles that must not see it.
+leak_probes:
+  - { q: "What repayment pause options are there for hardship?", roles: [officer], forbidden: [POL-HARD-01] }
+  - { q: "interest and fee waiver severe hardship bereavement", roles: [officer], forbidden: [POL-HARD-01] }
+  - { q: "goodwill compensation payments team leader", roles: [officer], forbidden: [POL-COMP-01] }
+  - { q: "goodwill compensation payments team leader", roles: [hardship_specialist], forbidden: [POL-COMP-01] }
+  - { q: "velocity rule card-not-present transactions soft block", roles: [officer], forbidden: [POL-FRAUD-02] }
+  - { q: "mule indicators new payees password reset fraud score", roles: [hardship_specialist], forbidden: [POL-FRAUD-02] }
+  - { q: "fraud thresholds geography rule kilometres", roles: [], forbidden: [POL-FRAUD-02, POL-FRAUD-01, POL-DISP-01] }

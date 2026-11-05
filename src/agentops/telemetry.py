@@ -1,5 +1,15 @@
-"""OpenTelemetry setup. Console exporter by default; in-memory exporter for tests;
-OTLP (e.g. to Jaeger) when OTEL_EXPORTER_OTLP_ENDPOINT is set and the `otlp` extra is installed."""
+"""OpenTelemetry setup.
+
+LEARNING NOTES
+- A *trace* is one request's journey; *spans* are its steps (triage -> agent.run -> ...).
+  Attributes on spans (model, tokens, cost, prompt version) answer "why was this slow/expensive?".
+- Exporters decide where spans go: console (debugging), in-memory (tests assert on spans), or
+  OTLP (any backend: Jaeger locally, Langfuse for LLM-focused views, X-Ray on AWS).
+- BatchSpanProcessor for OTLP so exporting never blocks a request; SimpleSpanProcessor for tests
+  so spans are visible immediately.
+- Never put raw PII in span attributes. Only counts (pii.redactions) and redacted text.
+"""
+
 from __future__ import annotations
 
 import os
@@ -20,16 +30,17 @@ def init(console: bool = False, memory: bool = False) -> InMemorySpanExporter | 
         _provider = TracerProvider(resource=Resource.create({"service.name": "agentops-platform"}))
         trace.set_tracer_provider(_provider)
         if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
-            # Reads the endpoint from the env var itself; Batch so exporting never blocks a request.
+            # Reads endpoint (and headers, e.g. Langfuse auth) from standard OTEL_* env vars.
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
             _provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     if console:
         _provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-    if memory:
+    if memory and _exporter is None:
         _exporter = InMemorySpanExporter()
         _provider.add_span_processor(SimpleSpanProcessor(_exporter))
     return _exporter
 
 
-def tracer():
+def tracer() -> trace.Tracer:
     return trace.get_tracer("agentops")

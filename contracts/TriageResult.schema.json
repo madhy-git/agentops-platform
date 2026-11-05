@@ -1,0 +1,75 @@
+{
+  "description": "What the agent must return. Validation failure => PydanticAI asks the model to retry.",
+  "properties": {
+    "schema_version": {
+      "const": "1.1",
+      "default": "1.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "category": {
+      "enum": [
+        "hardship",
+        "dispute",
+        "fraud",
+        "complaint",
+        "general"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "summary": {
+      "maxLength": 300,
+      "title": "Summary",
+      "type": "string"
+    },
+    "recommended_action": {
+      "enum": [
+        "answer",
+        "escalate",
+        "refund_review",
+        "freeze_card",
+        "hardship_review"
+      ],
+      "title": "Recommended Action",
+      "type": "string"
+    },
+    "needs_human": {
+      "title": "Needs Human",
+      "type": "boolean"
+    },
+    "confidence": {
+      "description": "Model's own confidence in the category, 0-1",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "citations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Citations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "category",
+    "severity",
+    "summary",
+    "recommended_action",
+    "needs_human",
+    "confidence"
+  ],
+  "title": "TriageResult",
+  "type": "object"
+}

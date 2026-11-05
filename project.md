@@ -252,7 +252,7 @@ OpenTelemetry -> Langfuse; eval gate, red-team set and lifecycle replay in CI
 | Evals run as a CI gate (category accuracy, escalation recall, injection block rate) | A change cannot ship if safety-critical recall drops |
 
 ### Results (built)
-30 tests pass. The eval gate passes on a 30-case golden set: 26 gate offline; 4 paraphrase cases gate only in live mode because the offline rules miss all of them. CI runs tests plus the gate on every push.
+All eight phases have a minimal working version (see `../LEARNING_TRACKER.md` for status and findings per phase). 114 tests pass (unit, contract, integration, replay). The 7-metric eval gate passes offline on a 30-case golden set (4 paraphrase cases gate only in live mode). Replay (S6) is 100%; S3, S4, S5, S7, S8 and S9 have passing tests. AWS infrastructure is validated (cfn-lint, Checkov, kubeconform, Trivy) but not deployed. No live-model baseline yet.
 
 ### Limits
 - Default mode uses a deterministic offline model so CI needs no API keys. Its eval scores prove the pipeline and gate, not model quality. Run `AGENTOPS_MODE=live` with provider credentials for real quality numbers.
@@ -320,9 +320,9 @@ Each phase ends with tests, recorded eval numbers, an ADR, a threat-model update
 | Human approval for high impact | Moving to enforcement needs a manager with the approve scope |
 | Audit trail | Every call logged, allowed or denied, with role, tool and reason |
 
-**Results.** 5 tests pass using an in-memory MCP client.
+**Results.** 8 tests pass using an in-memory MCP client, including the Wattle Bank profile and idempotency keys.
 
-**Limits.** Seed data is in memory and the role comes from an environment variable. Production would use a real case store and OIDC claims. The Wattle Bank profile and idempotency keys are planned, not built.
+**Limits.** Seed data is in memory and the role comes from an environment variable (or agentops-platform in-process). Production would use a real case store and OIDC claims over HTTP.
 
 **Design inspiration.** Reflects a common pattern in regulated case-management platforms: case and workflow capabilities exposed to AI assistants with human approval kept on regulatory decisions.
 

@@ -1,0 +1,76 @@
+# Lifecycle replay journeys (scenario S6). Run by evals/replay.py and tests/replay/.
+#
+# LEARNING NOTE: each step states what MUST be true afterwards. Expectations are written by a
+# person from the policy (project.md tables), never generated from the engine's own output;
+# otherwise the test only proves the engine agrees with itself.
+#
+# Step events: message (runs the decision service), clear_flag, tick (time passes, nothing else).
+# Expect keys: flags, marketing_suppressed, stage, needs_approval, reason_codes (subset),
+#              actions_include, actions_exclude, top_candidate, candidates_exclude, error.
+
+profiles:
+  low_risk: { monthly_logins: 20, complaints_12m: 0, balance_trend: 0.2, products: [everyday, savings, credit_card], tenure_days: 2500, missed_payments_90d: 0 }
+  high_risk: { monthly_logins: 1, complaints_12m: 2, balance_trend: -0.7, products: [everyday], tenure_days: 120, missed_payments_90d: 2 }
+
+journeys:
+  - id: J1-fraud-block-clear-cooloff
+    customer: { stage: everyday, profile: low_risk }
+    steps:
+      - { day: 0, event: message, category: fraud, recommended_action: freeze_card,
+          expect: { flags: [fraud_flag], marketing_suppressed: true, stage: distress, needs_approval: true,
+                    reason_codes: [FRAUD_SUSPECTED, NEEDS_APPROVAL, MARKETING_SUPPRESSED], actions_include: [block_card],
+                    candidates_exclude: [credit_limit_increase, savings_bonus_rate] } }
+      - { day: 3, event: clear_flag, flag: fraud_flag, roles: [officer], expect: { error: FlagPermissionError } }
+      - { day: 4, event: clear_flag, flag: fraud_flag, roles: [fraud_specialist],
+          expect: { flags: [], marketing_suppressed: true, stage: resolution } }
+      - { day: 20, event: message, category: general,
+          expect: { marketing_suppressed: true, reason_codes: [MARKETING_SUPPRESSED], candidates_exclude: [savings_bonus_rate] } }
+      - { day: 40, event: tick, expect: { marketing_suppressed: false, stage: everyday } }
+      - { day: 41, event: message, category: general, expect: { marketing_suppressed: false, top_candidate: home_loan_refinance } }
+
+  - id: J2-hardship-no-debt-offers
+    customer: { stage: everyday, profile: high_risk }
+    steps:
+      - { day: 0, event: message, category: hardship, recommended_action: hardship_review,
+          expect: { flags: [hardship_flag], marketing_suppressed: true, stage: distress, needs_approval: true,
+                    actions_include: [hardship_review, hold_collections],
+                    candidates_exclude: [credit_limit_increase, home_loan_refinance, savings_bonus_rate] } }
+      # R6 must NOT fire while a hardship flag is active, even for a high-risk customer.
+      - { day: 2, event: message, category: general, expect: { reason_codes_exclude: [RISK_HIGH], top_candidate: retention_fee_waiver } }
+      - { day: 3, event: clear_flag, flag: hardship_flag, roles: [officer], expect: { error: FlagPermissionError } }
+      - { day: 90, event: clear_flag, flag: hardship_flag, roles: [hardship_specialist], expect: { flags: [], stage: resolution } }
+
+  - id: J3-complaint-high-risk-retention-first
+    customer: { stage: retention, profile: high_risk }
+    steps:
+      - { day: 0, event: message, category: complaint, recommended_action: escalate,
+          expect: { flags: [complaint_open], marketing_suppressed: true, needs_approval: false,
+                    reason_codes: [COMPLAINT_CLOCK, RISK_HIGH, MARKETING_SUPPRESSED], top_candidate: retention_fee_waiver } }
+      - { day: 10, event: clear_flag, flag: complaint_open, roles: [system], expect: { flags: [], marketing_suppressed: true } }
+
+  - id: J4-high-risk-no-flags-marketing-allowed
+    customer: { stage: everyday, profile: high_risk }
+    steps:
+      - { day: 0, event: message, category: general,
+          expect: { flags: [], marketing_suppressed: false, reason_codes: [RISK_HIGH], top_candidate: retention_fee_waiver } }
+
+  - id: J5-dispute-out-of-window
+    customer: { stage: everyday, profile: low_risk }
+    steps:
+      - { day: 0, event: message, category: dispute, recommended_action: refund_review, txn_age_days: 150,
+          expect: { reason_codes: [DISPUTE_OUT_OF_WINDOW], actions_include: [manual_review], actions_exclude: [refund_review],
+                    needs_approval: false, marketing_suppressed: false } }
+
+  - id: J6-dispute-in-window-officer-vs-manager
+    customer: { stage: everyday, profile: low_risk }
+    steps:
+      - { day: 0, event: message, category: dispute, recommended_action: refund_review, txn_age_days: 10,
+          expect: { reason_codes: [DISPUTE_IN_WINDOW, NEEDS_APPROVAL], needs_approval: true, actions_include: [refund_review] } }
+      - { day: 1, event: message, category: dispute, recommended_action: refund_review, txn_age_days: 10, role: manager,
+          expect: { needs_approval: false, actions_include: [refund_review] } }
+
+  - id: J7-onboarding-general
+    customer: { stage: onboarding, profile: low_risk }
+    steps:
+      - { day: 0, event: message, category: general,
+          expect: { flags: [], marketing_suppressed: false, stage: onboarding, needs_approval: false } }

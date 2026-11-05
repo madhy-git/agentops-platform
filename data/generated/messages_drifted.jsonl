@@ -1,0 +1,300 @@
+{"message_id": "MSG-00001", "customer_id": "CUS-01696", "text": "Can I set up a direct debit in the app?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00002", "customer_id": "CUS-00435", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00003", "customer_id": "CUS-02850", "text": "There are unauthorised charges on my account from a petrol station", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00004", "customer_id": "CUS-01448", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00005", "customer_id": "CUS-01222", "text": "I was charged twice at Bondi, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00006", "customer_id": "CUS-02578", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00007", "customer_id": "CUS-00790", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00008", "customer_id": "CUS-00584", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00009", "customer_id": "CUS-02205", "text": "Can I set up a direct debit in the app?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00010", "customer_id": "CUS-00504", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00011", "customer_id": "CUS-02701", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00012", "customer_id": "CUS-02916", "text": "I was charged twice at Parramatta, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00013", "customer_id": "CUS-02422", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00014", "customer_id": "CUS-00600", "text": "I was charged twice at Fitzroy, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00015", "customer_id": "CUS-01729", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00016", "customer_id": "CUS-00056", "text": "There are unauthorised charges on my account from a petrol station", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00017", "customer_id": "CUS-02439", "text": "My card was stolen at a petrol station", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00018", "customer_id": "CUS-02488", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00019", "customer_id": "CUS-02018", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00020", "customer_id": "CUS-01415", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00021", "customer_id": "CUS-00506", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00022", "customer_id": "CUS-02227", "text": "There are unauthorised charges on my account from Bondi", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00023", "customer_id": "CUS-00921", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00024", "customer_id": "CUS-00331", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00025", "customer_id": "CUS-01780", "text": "I was charged twice at the airport, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00026", "customer_id": "CUS-02753", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00027", "customer_id": "CUS-02148", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00028", "customer_id": "CUS-01426", "text": "Your staff were rude to me on the phone", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00029", "customer_id": "CUS-00595", "text": "the airport took $900 but I cancelled weeks ago", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00030", "customer_id": "CUS-01467", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00031", "customer_id": "CUS-02272", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00032", "customer_id": "CUS-01043", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00033", "customer_id": "CUS-00775", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00034", "customer_id": "CUS-02703", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00035", "customer_id": "CUS-02513", "text": "Please refund the duplicate payment to a petrol station", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00036", "customer_id": "CUS-00880", "text": "A man on the phone said he was from the bank and I gave him a code", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00037", "customer_id": "CUS-00370", "text": "My card was stolen at the airport", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00038", "customer_id": "CUS-02033", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00039", "customer_id": "CUS-01430", "text": "Please refund the duplicate payment to Fitzroy", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00040", "customer_id": "CUS-02803", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00041", "customer_id": "CUS-00507", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00042", "customer_id": "CUS-00309", "text": "What time does the Fitzroy branch open?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00043", "customer_id": "CUS-00619", "text": "I was charged twice at the airport, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00044", "customer_id": "CUS-02757", "text": "Please refund the duplicate payment to the airport", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00045", "customer_id": "CUS-02508", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00046", "customer_id": "CUS-00985", "text": "Your staff were rude to me on the phone", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00047", "customer_id": "CUS-01037", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00048", "customer_id": "CUS-00421", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00049", "customer_id": "CUS-00193", "text": "My card was stolen at Parramatta", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00050", "customer_id": "CUS-01382", "text": "I was charged twice at Parramatta, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00051", "customer_id": "CUS-02951", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00052", "customer_id": "CUS-01147", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00053", "customer_id": "CUS-01009", "text": "I was charged twice at Parramatta, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00054", "customer_id": "CUS-02477", "text": "a petrol station took $45 but I cancelled weeks ago", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00055", "customer_id": "CUS-00303", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00056", "customer_id": "CUS-02487", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00057", "customer_id": "CUS-01540", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00058", "customer_id": "CUS-02410", "text": "a petrol station took $45 but I cancelled weeks ago", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00059", "customer_id": "CUS-01372", "text": "Your staff were rude to me on the phone", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00060", "customer_id": "CUS-01530", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00061", "customer_id": "CUS-01726", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00062", "customer_id": "CUS-01772", "text": "I think this is a scam, someone called pretending to be you", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00063", "customer_id": "CUS-00744", "text": "The merchant never delivered my order", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00064", "customer_id": "CUS-02404", "text": "Your staff were rude to me on the phone", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00065", "customer_id": "CUS-02010", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00066", "customer_id": "CUS-00821", "text": "My partner passed away and money is tight", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00067", "customer_id": "CUS-02604", "text": "What's the rate on the savings account?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00068", "customer_id": "CUS-00037", "text": "I was charged twice at the airport, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00069", "customer_id": "CUS-01704", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00070", "customer_id": "CUS-00203", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00071", "customer_id": "CUS-02691", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00072", "customer_id": "CUS-02613", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00073", "customer_id": "CUS-01639", "text": "There are unauthorised charges on my account from Fitzroy", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00074", "customer_id": "CUS-00364", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00075", "customer_id": "CUS-02251", "text": "There are unauthorised charges on my account from a petrol station", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00076", "customer_id": "CUS-02129", "text": "I think this is a scam, someone called pretending to be you", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00077", "customer_id": "CUS-02810", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00078", "customer_id": "CUS-00704", "text": "Please refund the duplicate payment to a petrol station", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00079", "customer_id": "CUS-01093", "text": "My card was stolen at Bondi", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00080", "customer_id": "CUS-02984", "text": "The merchant never delivered my order", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00081", "customer_id": "CUS-00087", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00082", "customer_id": "CUS-01816", "text": "What time does the a petrol station branch open?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00083", "customer_id": "CUS-01120", "text": "There are unauthorised charges on my account from Bondi", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00084", "customer_id": "CUS-02163", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00085", "customer_id": "CUS-02303", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00086", "customer_id": "CUS-00746", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00087", "customer_id": "CUS-01569", "text": "I was charged twice at Parramatta, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00088", "customer_id": "CUS-01947", "text": "Please refund the duplicate payment to an online store", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00089", "customer_id": "CUS-00085", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00090", "customer_id": "CUS-01269", "text": "A man on the phone said he was from the bank and I gave him a code", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00091", "customer_id": "CUS-01140", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00092", "customer_id": "CUS-01024", "text": "The merchant never delivered my order", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00093", "customer_id": "CUS-02058", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00094", "customer_id": "CUS-02383", "text": "I want to dispute a wrong charge of $640", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00095", "customer_id": "CUS-01458", "text": "Can I set up a direct debit in the app?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00096", "customer_id": "CUS-01482", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00097", "customer_id": "CUS-02474", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00098", "customer_id": "CUS-01687", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00099", "customer_id": "CUS-01838", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00100", "customer_id": "CUS-01990", "text": "My partner passed away and money is tight", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00101", "customer_id": "CUS-01533", "text": "Please refund the duplicate payment to a petrol station", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00102", "customer_id": "CUS-01288", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00103", "customer_id": "CUS-00863", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00104", "customer_id": "CUS-02095", "text": "I was charged twice at a petrol station, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00105", "customer_id": "CUS-02548", "text": "I've been unwell and haven't been able to work", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00106", "customer_id": "CUS-01342", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00107", "customer_id": "CUS-02057", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00108", "customer_id": "CUS-02194", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00109", "customer_id": "CUS-01326", "text": "I think this is a scam, someone called pretending to be you", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00110", "customer_id": "CUS-00442", "text": "Please refund the duplicate payment to Bondi", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00111", "customer_id": "CUS-02343", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00112", "customer_id": "CUS-01357", "text": "What's the rate on the savings account?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00113", "customer_id": "CUS-01359", "text": "Please refund the duplicate payment to Fitzroy", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00114", "customer_id": "CUS-01569", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00115", "customer_id": "CUS-00888", "text": "What's the rate on the savings account?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00116", "customer_id": "CUS-00659", "text": "Someone used my card without permission at an online store", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00117", "customer_id": "CUS-01287", "text": "Please refund the duplicate payment to Fitzroy", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00118", "customer_id": "CUS-01161", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00119", "customer_id": "CUS-01466", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00120", "customer_id": "CUS-00286", "text": "A man on the phone said he was from the bank and I gave him a code", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00121", "customer_id": "CUS-01004", "text": "There's a $45 payment I never made", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00122", "customer_id": "CUS-01536", "text": "Please refund the duplicate payment to the airport", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00123", "customer_id": "CUS-02397", "text": "Please refund the duplicate payment to a petrol station", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00124", "customer_id": "CUS-02724", "text": "What time does the a petrol station branch open?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00125", "customer_id": "CUS-00025", "text": "Please refund the duplicate payment to a petrol station", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00126", "customer_id": "CUS-00792", "text": "What time does the the airport branch open?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00127", "customer_id": "CUS-02906", "text": "I want to dispute a wrong charge of $640", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00128", "customer_id": "CUS-02624", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00129", "customer_id": "CUS-02193", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00130", "customer_id": "CUS-02916", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00131", "customer_id": "CUS-02341", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00132", "customer_id": "CUS-01451", "text": "I've been unwell and haven't been able to work", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00133", "customer_id": "CUS-02669", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00134", "customer_id": "CUS-00899", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00135", "customer_id": "CUS-00856", "text": "I was charged twice at an online store, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00136", "customer_id": "CUS-02345", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00137", "customer_id": "CUS-00811", "text": "I want to dispute a wrong charge of $120", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00138", "customer_id": "CUS-00654", "text": "Your staff were rude to me on the phone", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00139", "customer_id": "CUS-00282", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00140", "customer_id": "CUS-02972", "text": "I want to dispute a wrong charge of $45", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00141", "customer_id": "CUS-01568", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00142", "customer_id": "CUS-00727", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00143", "customer_id": "CUS-00318", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00144", "customer_id": "CUS-00419", "text": "My partner passed away and money is tight", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00145", "customer_id": "CUS-01508", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00146", "customer_id": "CUS-01148", "text": "I'm fed up with how I've been treated", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00147", "customer_id": "CUS-01644", "text": "What time does the a petrol station branch open?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00148", "customer_id": "CUS-00176", "text": "I'm fed up with how I've been treated", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00149", "customer_id": "CUS-02686", "text": "There are unauthorised charges on my account from Fitzroy", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00150", "customer_id": "CUS-02962", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00151", "customer_id": "CUS-02301", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00152", "customer_id": "CUS-00616", "text": "I was charged twice at a petrol station, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00153", "customer_id": "CUS-00623", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00154", "customer_id": "CUS-02894", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00155", "customer_id": "CUS-02980", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00156", "customer_id": "CUS-02034", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00157", "customer_id": "CUS-00903", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00158", "customer_id": "CUS-00720", "text": "There are unauthorised charges on my account from a petrol station", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00159", "customer_id": "CUS-00392", "text": "A man on the phone said he was from the bank and I gave him a code", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00160", "customer_id": "CUS-00545", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00161", "customer_id": "CUS-02663", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00162", "customer_id": "CUS-02011", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00163", "customer_id": "CUS-02949", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00164", "customer_id": "CUS-01805", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00165", "customer_id": "CUS-02942", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00166", "customer_id": "CUS-02988", "text": "There are unauthorised charges on my account from the airport", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00167", "customer_id": "CUS-01774", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00168", "customer_id": "CUS-01260", "text": "I was charged twice at an online store, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00169", "customer_id": "CUS-01104", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00170", "customer_id": "CUS-02650", "text": "My card was stolen at an online store", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00171", "customer_id": "CUS-02573", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00172", "customer_id": "CUS-01241", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00173", "customer_id": "CUS-02726", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00174", "customer_id": "CUS-01356", "text": "My card was stolen at Bondi", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00175", "customer_id": "CUS-00066", "text": "I was charged twice at Bondi, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00176", "customer_id": "CUS-00840", "text": "I've been unwell and haven't been able to work", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00177", "customer_id": "CUS-02335", "text": "A man on the phone said he was from the bank and I gave him a code", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00178", "customer_id": "CUS-02407", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00179", "customer_id": "CUS-02027", "text": "I was charged twice at Parramatta, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00180", "customer_id": "CUS-02169", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00181", "customer_id": "CUS-02442", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00182", "customer_id": "CUS-01500", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00183", "customer_id": "CUS-00788", "text": "Parramatta took $1500 but I cancelled weeks ago", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00184", "customer_id": "CUS-00292", "text": "Please refund the duplicate payment to the airport", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00185", "customer_id": "CUS-02876", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00186", "customer_id": "CUS-01866", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00187", "customer_id": "CUS-01782", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00188", "customer_id": "CUS-00072", "text": "I was charged twice at Fitzroy, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00189", "customer_id": "CUS-02070", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00190", "customer_id": "CUS-00541", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00191", "customer_id": "CUS-01601", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00192", "customer_id": "CUS-00074", "text": "There are unauthorised charges on my account from Fitzroy", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00193", "customer_id": "CUS-01376", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00194", "customer_id": "CUS-02053", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00195", "customer_id": "CUS-02204", "text": "I think this is a scam, someone called pretending to be you", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00196", "customer_id": "CUS-00101", "text": "A man on the phone said he was from the bank and I gave him a code", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00197", "customer_id": "CUS-02612", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00198", "customer_id": "CUS-01104", "text": "My card was stolen at the airport", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00199", "customer_id": "CUS-01350", "text": "My partner passed away and money is tight", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00200", "customer_id": "CUS-02009", "text": "The merchant never delivered my order", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00201", "customer_id": "CUS-00562", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00202", "customer_id": "CUS-01915", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00203", "customer_id": "CUS-02483", "text": "a petrol station took $640 but I cancelled weeks ago", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00204", "customer_id": "CUS-02258", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00205", "customer_id": "CUS-01658", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00206", "customer_id": "CUS-00137", "text": "I was charged twice at the airport, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00207", "customer_id": "CUS-00841", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00208", "customer_id": "CUS-02830", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00209", "customer_id": "CUS-01155", "text": "I'm fed up with how I've been treated", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00210", "customer_id": "CUS-02789", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00211", "customer_id": "CUS-02774", "text": "What time does the Bondi branch open?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00212", "customer_id": "CUS-01354", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00213", "customer_id": "CUS-00830", "text": "A man on the phone said he was from the bank and I gave him a code", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00214", "customer_id": "CUS-01364", "text": "I want to dispute a wrong charge of $1500", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00215", "customer_id": "CUS-01094", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00216", "customer_id": "CUS-02292", "text": "I want to dispute a wrong charge of $1500", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00217", "customer_id": "CUS-02925", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00218", "customer_id": "CUS-02713", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00219", "customer_id": "CUS-00949", "text": "My card was stolen at Parramatta", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00220", "customer_id": "CUS-00546", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00221", "customer_id": "CUS-01213", "text": "I want to dispute a wrong charge of $120", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00222", "customer_id": "CUS-00499", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00223", "customer_id": "CUS-02119", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00224", "customer_id": "CUS-02836", "text": "I'm fed up with how I've been treated", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00225", "customer_id": "CUS-00981", "text": "I was charged twice at Fitzroy, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00226", "customer_id": "CUS-01761", "text": "I was charged twice at the airport, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00227", "customer_id": "CUS-01794", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00228", "customer_id": "CUS-01374", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00229", "customer_id": "CUS-00613", "text": "I'm fed up with how I've been treated", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00230", "customer_id": "CUS-00203", "text": "A man on the phone said he was from the bank and I gave him a code", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00231", "customer_id": "CUS-02758", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00232", "customer_id": "CUS-01406", "text": "My card was stolen at an online store", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00233", "customer_id": "CUS-01443", "text": "There's a $900 payment I never made", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00234", "customer_id": "CUS-01489", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00235", "customer_id": "CUS-00127", "text": "What time does the Parramatta branch open?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00236", "customer_id": "CUS-01348", "text": "What's the rate on the savings account?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00237", "customer_id": "CUS-02065", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00238", "customer_id": "CUS-01709", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00239", "customer_id": "CUS-01216", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00240", "customer_id": "CUS-00375", "text": "What time does the Fitzroy branch open?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00241", "customer_id": "CUS-02505", "text": "Can I set up a direct debit in the app?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00242", "customer_id": "CUS-00897", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00243", "customer_id": "CUS-02592", "text": "There are unauthorised charges on my account from Bondi", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00244", "customer_id": "CUS-00156", "text": "Please refund the duplicate payment to the airport", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00245", "customer_id": "CUS-01909", "text": "I want to dispute a wrong charge of $45", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00246", "customer_id": "CUS-02158", "text": "My card was stolen at the airport", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00247", "customer_id": "CUS-00445", "text": "The merchant never delivered my order", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00248", "customer_id": "CUS-00118", "text": "Your staff were rude to me on the phone", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00249", "customer_id": "CUS-02254", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00250", "customer_id": "CUS-00727", "text": "I was charged twice at Fitzroy, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00251", "customer_id": "CUS-02748", "text": "I want to dispute a wrong charge of $900", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00252", "customer_id": "CUS-02156", "text": "I think this is a scam, someone called pretending to be you", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00253", "customer_id": "CUS-01313", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00254", "customer_id": "CUS-01106", "text": "I think this is a scam, someone called pretending to be you", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00255", "customer_id": "CUS-00795", "text": "Someone used my card without permission at Fitzroy", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00256", "customer_id": "CUS-01022", "text": "Please refund the duplicate payment to Bondi", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00257", "customer_id": "CUS-01996", "text": "Please refund the duplicate payment to an online store", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00258", "customer_id": "CUS-00553", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00259", "customer_id": "CUS-00482", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00260", "customer_id": "CUS-02575", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00261", "customer_id": "CUS-01077", "text": "Can I set up a direct debit in the app?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00262", "customer_id": "CUS-00456", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00263", "customer_id": "CUS-00253", "text": "I lost my job and can't pay my credit card this month", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00264", "customer_id": "CUS-02969", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00265", "customer_id": "CUS-01536", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00266", "customer_id": "CUS-02263", "text": "I paid for something that never arrived", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00267", "customer_id": "CUS-02149", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00268", "customer_id": "CUS-01742", "text": "My partner passed away and money is tight", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00269", "customer_id": "CUS-00310", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00270", "customer_id": "CUS-00619", "text": "There's a $1500 payment I never made", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00271", "customer_id": "CUS-00395", "text": "I want to dispute a wrong charge of $45", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00272", "customer_id": "CUS-00333", "text": "I've been unwell and haven't been able to work", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00273", "customer_id": "CUS-02961", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00274", "customer_id": "CUS-02859", "text": "This is a formal complaint", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00275", "customer_id": "CUS-01469", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00276", "customer_id": "CUS-00348", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00277", "customer_id": "CUS-02815", "text": "I'm very unhappy and will go to the ombudsman", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00278", "customer_id": "CUS-00168", "text": "I was charged twice at Fitzroy, please refund", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00279", "customer_id": "CUS-02384", "text": "Someone used my card without permission at Parramatta", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00280", "customer_id": "CUS-02767", "text": "I want to dispute a wrong charge of $45", "category": "dispute", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00281", "customer_id": "CUS-02517", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00282", "customer_id": "CUS-02969", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00283", "customer_id": "CUS-00215", "text": "I want to make a complaint about terrible service", "category": "complaint", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00284", "customer_id": "CUS-01456", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00285", "customer_id": "CUS-01342", "text": "There are unauthorised charges on my account from Parramatta", "category": "fraud", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00286", "customer_id": "CUS-01850", "text": "I'm fed up with how I've been treated", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00287", "customer_id": "CUS-01687", "text": "Can I set up a direct debit in the app?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00288", "customer_id": "CUS-01207", "text": "How do I download my statement?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00289", "customer_id": "CUS-01378", "text": "Your staff were rude to me on the phone", "category": "complaint", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00290", "customer_id": "CUS-02856", "text": "What's the rate on the savings account?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00291", "customer_id": "CUS-00253", "text": "What's the rate on the savings account?", "category": "general", "needs_human": false, "style": "paraphrase"}
+{"message_id": "MSG-00292", "customer_id": "CUS-02900", "text": "How is credit card interest calculated?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00293", "customer_id": "CUS-02955", "text": "I'm struggling to make repayments", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00294", "customer_id": "CUS-01747", "text": "Financial hardship, I cannot pay the loan", "category": "hardship", "needs_human": true, "style": "keyword"}
+{"message_id": "MSG-00295", "customer_id": "CUS-02274", "text": "The merchant never delivered my order", "category": "dispute", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00296", "customer_id": "CUS-02932", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00297", "customer_id": "CUS-00539", "text": "There's a $900 payment I never made", "category": "fraud", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00298", "customer_id": "CUS-02741", "text": "What are the fees on the everyday account?", "category": "general", "needs_human": false, "style": "keyword"}
+{"message_id": "MSG-00299", "customer_id": "CUS-01869", "text": "My hours were cut and the credit card repayment is due Friday", "category": "hardship", "needs_human": true, "style": "paraphrase"}
+{"message_id": "MSG-00300", "customer_id": "CUS-02832", "text": "I've called four times and nobody fixed it", "category": "complaint", "needs_human": true, "style": "paraphrase"}

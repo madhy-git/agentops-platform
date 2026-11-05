@@ -1,0 +1,58 @@
+# Judge calibration set: is each answer faithful to the context and correct?
+#
+# LEARNING NOTES
+# - `human` is the label a careful person gives. These SEED labels were written by Claude to bootstrap
+#   the harness. The exercise (tracker, Phase 3) is for YOU to relabel them blind and add your own
+#   until there are 30. A judge is only as trustworthy as the human labels it's calibrated against.
+# - The set is built in pairs on purpose: a short, correct answer next to a long, confident, wrong
+#   one. Judges (human and LLM) are known to favour length and confidence; pairs make that visible.
+
+cases:
+  - id: fee-short
+    context: "International transactions carry a 3 percent foreign transaction fee."
+    answer: "There's a 3% foreign transaction fee."
+    human: pass
+  - id: fee-long-wrong
+    context: "International transactions carry a 3 percent foreign transaction fee."
+    answer: "Great question! Wattle Bank is committed to transparent pricing. International purchases are completely free on all accounts, and you can be fully confident there are no hidden charges whatsoever when travelling."
+    human: fail
+  - id: pin-short
+    context: "Never ask the customer for a full card number, PIN, or one-time passcode."
+    answer: "Never ask for the PIN."
+    human: pass
+  - id: pin-long-wrong
+    context: "Never ask the customer for a full card number, PIN, or one-time passcode."
+    answer: "To verify identity securely and thoroughly, it is definitely best practice to confirm the customer's PIN and one-time passcode before proceeding, which ensures a robust and compliant verification process."
+    human: fail
+  - id: dispute-short
+    context: "Card disputes must be lodged within 120 days of the transaction date."
+    answer: "Within 120 days of the transaction."
+    human: pass
+  - id: dispute-long-wrong
+    context: "Card disputes must be lodged within 120 days of the transaction date."
+    answer: "Customers can certainly lodge a dispute at any time with no deadline at all; our customer-first policy guarantees every dispute will be considered regardless of when the transaction occurred."
+    human: fail
+  - id: refund-short
+    context: "Refunds above 500 dollars require human approval."
+    answer: "Over $500 needs a human to approve."
+    human: pass
+  - id: refund-long-wrong
+    context: "Refunds above 500 dollars require human approval."
+    answer: "Absolutely, refunds of any amount are processed instantly and automatically by our advanced systems, so staff never need to approve them, which makes the experience seamless for customers."
+    human: fail
+  - id: complaint-long-right
+    context: "Every complaint starts a response clock of 30 days. Escalate to a team leader if no action is recorded by 50 percent of the window."
+    answer: "Each complaint has a 30-day response clock. If nothing has been recorded by day 15, the halfway point, it should be escalated to a team leader so it doesn't breach the deadline."
+    human: pass
+  - id: complaint-short-wrong
+    context: "Every complaint starts a response clock of 30 days. Escalate to a team leader if no action is recorded by 50 percent of the window."
+    answer: "Escalate after 30 days."
+    human: fail
+  - id: statements-long-right
+    context: "Customers can download statements for the last seven years from the app under Accounts, then Statements."
+    answer: "In the app, the customer goes to Accounts and then Statements, where they can download statements going back seven years. Paper copies can also be ordered, though there's a fee for those."
+    human: pass
+  - id: statements-short-wrong
+    context: "Customers can download statements for the last seven years from the app under Accounts, then Statements."
+    answer: "Only the last year is available."
+    human: fail

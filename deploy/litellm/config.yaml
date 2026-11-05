@@ -1,0 +1,30 @@
+# LiteLLM gateway config.
+#
+# LEARNING NOTE: the app never names a real model. The router picks a *tier alias*
+# (agentops-tier1/2/3) and LiteLLM resolves it here. This is where you:
+#   - swap providers (Bedrock today, Anthropic API or Azure tomorrow)
+#   - add fallbacks at the gateway level (in addition to the app's own fallback chain)
+#   - set budgets and rate limits per key
+# Check current model ids for your provider before using; they change over time.
+
+model_list:
+  - model_name: agentops-tier1          # small/fast: general enquiries
+    litellm_params:
+      model: anthropic/claude-haiku-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: agentops-tier2          # mid: tool use, longer messages
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: agentops-tier3          # frontier: high-risk regulated categories
+    litellm_params:
+      model: anthropic/claude-opus-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # Bedrock alternative (Phase 6 target). Uncomment and remove the entries above.
+  # - model_name: agentops-tier1
+  #   litellm_params: { model: bedrock/anthropic.claude-haiku-5-5, aws_region_name: ap-southeast-2 }
+
+litellm_settings:
+  drop_params: true        # silently drop params a provider doesn't support instead of erroring
+  request_timeout: 30

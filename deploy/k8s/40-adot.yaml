@@ -1,0 +1,44 @@
+# AWS Distro for OpenTelemetry collector: receives OTLP from the app, exports traces to X-Ray.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: adot-config, namespace: agentops }
+data:
+  config.yaml: |
+    receivers:
+      otlp: { protocols: { http: { endpoint: 0.0.0.0:4318 } } }
+    processors:
+      batch: {}
+    exporters:
+      awsxray: { region: "${AWS_REGION}" }
+    service:
+      pipelines:
+        traces: { receivers: [otlp], processors: [batch], exporters: [awsxray] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: adot-collector, namespace: agentops, labels: { app: adot-collector } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: adot-collector } }
+  template:
+    metadata: { labels: { app: adot-collector } }
+    spec:
+      serviceAccountName: adot-collector
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: collector
+          image: public.ecr.aws/aws-observability/aws-otel-collector:v0.43.1
+          args: ["--config=/etc/adot/config.yaml"]
+          ports: [{ containerPort: 4318 }]
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 256Mi } }
+          volumeMounts: [{ name: config, mountPath: /etc/adot }]
+      volumes: [{ name: config, configMap: { name: adot-config } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: adot-collector, namespace: agentops }
+spec:
+  selector: { app: adot-collector }
+  ports: [{ port: 4318, targetPort: 4318 }]

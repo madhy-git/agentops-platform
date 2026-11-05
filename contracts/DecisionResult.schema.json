@@ -1,0 +1,102 @@
+{
+  "description": "What the *rules* decided. The LLM recommends; this authorises (project.md design rationale).",
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "decision_id": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decision Id"
+    },
+    "customer_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Customer Id"
+    },
+    "queue": {
+      "title": "Queue",
+      "type": "string"
+    },
+    "priority": {
+      "enum": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "title": "Priority",
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Actions",
+      "type": "array"
+    },
+    "needs_approval": {
+      "title": "Needs Approval",
+      "type": "boolean"
+    },
+    "flags_set": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Flags Set",
+      "type": "array"
+    },
+    "suppressed_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Suppressed Actions",
+      "type": "array"
+    },
+    "candidate_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Candidate Actions",
+      "type": "array"
+    },
+    "policy_version": {
+      "title": "Policy Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "customer_id",
+    "queue",
+    "priority",
+    "reason_codes",
+    "actions",
+    "needs_approval",
+    "policy_version"
+  ],
+  "title": "DecisionResult",
+  "type": "object"
+}

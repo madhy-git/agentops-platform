@@ -1,123 +1,117 @@
 # AgentOps Platform
 
-A small, tested reference implementation of the operational layer around an AI agent in a regulated setting: triaging customer messages for Wattle Bank, a fictional Australian bank. The agent is the easy part. This repo is about running it safely: what goes in, which model runs, who approves risky actions, and how quality is gated before release.
+A tested reference implementation of the operational layer around an AI agent in a regulated setting: triaging customer messages and assisting staff at **Wattle Bank**, a fictional Australian bank. The agent is the easy part. This repo is about running it safely: what goes in, which model runs, what the rules allow, who approves, what the agent can touch, how quality is gated, and how it all runs in production.
 
-All data is synthetic. The full design and phased roadmap are in [project.md](project.md).
+It's also a **learning project**: every module opens with *LEARNING NOTES*, and progress is tracked in `../LEARNING_TRACKER.md`. All data is synthetic.
 
-## Flow
-
-```text
-message -> PII redaction -> prompt-injection check -> cost-aware model router
-        -> PydanticAI agent (tools: lookup_case, search_policy with citations)
-        -> typed TriageResult -> human-in-the-loop gate -> approved action runs -> audit log
-        (fallback to the next model if one fails; every step traced with OpenTelemetry)
-```
+- **New here?** Read [docs/STRUCTURE.md](docs/STRUCTURE.md): a map of the code and one request traced end to end.
+- **The plan:** [project.md](project.md) (Phases 0–7). **The reasons:** [docs/adr/](docs/adr/).
 
 ## What's built
 
-| Capability | Where | Notes |
+| Area | Highlights | Phase |
 |---|---|---|
-| Typed structured output | `agent.py` | `TriageResult` schema with category, severity, action, `needs_human`, bounded `confidence`, citations |
-| Tool calling | `agent.py` | `search_policy` (cited) and `lookup_case`; a vulnerable customer forces human review |
-| Cost-aware model router | `router.py` | Cheapest model whose capability tier covers the task; budget cap |
-| Fallback chain | `service.py` | If the routed model fails, the next tier up is tried; each failure is traced and audited |
-| PII redaction | `guardrails.py` | Email, card, phone, TFN, BSB |
-| Prompt-injection check | `guardrails.py` | Normalises text first (Unicode look-alikes, zero-width chars, spaced letters), then pattern checks |
-| Human-in-the-loop | `service.py`, `approvals.py` | Fraud, hardship, dispute and complaint outcomes need approval; mutating actions run **only** after approval |
-| Audit log | `approvals.py` | Every triage, block, model failure, approval and action; in memory or SQLite |
-| Retrieval with citations | `rag.py` | Keyword retriever behind a `Retriever` protocol |
-| Observability | `telemetry.py` | OpenTelemetry spans with model, tier and cost attributes; optional OTLP export |
-| Eval gate | `evals/` | 30-case golden set; CI fails if accuracy, escalation recall or injection blocking drops |
-| API | `api.py` | FastAPI |
-| CI and container | `.github/workflows/ci.yml`, `Dockerfile` | Tests plus eval gate on every push |
+| Triage agent | PydanticAI, typed `TriageResult`, tools, cost-aware router, upward fallback, circuit breaker | 0, 4 |
+| Guardrails | PII redaction, direct + indirect injection, measured precision/recall/latency | 0, 3 |
+| Decision service | YAML rules R1–R7, flags with lifetimes, lifecycle, next-best-action, risk model + drift | 1 |
+| Identity-aware RAG | pgvector + full-text + hybrid; entitlement filter inside SQL; leak tests | 2 |
+| Evals | 7-metric release gate, red-team set, judge calibration, set-size, shadow runs, failure capture | 3 |
+| Observability | OpenTelemetry (GenAI conventions) → Jaeger; audit ↔ trace via `trace_id` | 0, 3 |
+| Workflow | Case state machine, domain-routed approvals with SLAs, separation of duties, exactly-once actions | 4 |
+| Identity | JWT (Keycloak verified locally; Cognito on AWS), role-aware API | 4, 6 |
+| Copilot | Streamed (SSE), cited, relevance-thresholded, refers to specialists instead of leaking | 4 |
+| MCP | Agent consumes `../mcp-case-tools` as the human's role | 4 |
+| Durable workflows | Temporal approvals; real-server drill with genuine downtime | 5 |
+| AWS | Nested CloudFormation, EKS + Pod Identity, RDS, Cognito, Bedrock; validated, **not deployed** | 6 |
+| Variants | LangGraph benchmark; OPA/Rego rules with exhaustive parity test | 7 |
 
-## Run it
+**Status:** 114 tests (unit, contract, integration, replay); ruff and mypy clean; eval gate passing offline.
 
-Requires Python 3.11+.
+## Quick start
+
+Requires Docker, [uv](https://docs.astral.sh/uv/) and Python 3.12 (uv installs it).
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pytest -q                                   # 30 tests
-PYTHONPATH=src python evals/run_evals.py    # eval gate
-uvicorn agentops.api:app --reload
+docker compose -f deploy/docker-compose.yml up -d postgres   # Postgres + pgvector on localhost:5433
+uv sync --all-extras                                         # app + dev tools + optional extras
+uv run pytest -q                                             # all tests (first run downloads a ~130 MB embedding model)
+uv run python evals/run_evals.py --report                    # the release gate
+uv run uvicorn agentops.api:create_app --factory --reload    # API on :8000
+uv run streamlit run ui/app.py                               # UI on :8501
 ```
 
-### Demo (60 seconds)
+Host port **5433** is deliberate: it avoids a locally installed Postgres on 5432.
+
+### Try it with curl
 
 ```bash
-# 1. A stolen-card message: PII redacted, routed by cost tier, held for approval
-curl -s localhost:8000/triage -H 'content-type: application/json' \
+TOKEN=$(uv run python -c "from agentops.auth import dev_token; print(dev_token('officer-1', ['officer']))")
+FRAUD=$(uv run python -c "from agentops.auth import dev_token; print(dev_token('fraud-1', ['officer','fraud_specialist']))")
+MGR=$(uv run python -c "from agentops.auth import dev_token; print(dev_token('manager-1', ['manager']))")
+
+# 1. Officer triages a stolen-card message: PII redacted, R1 fires, case opened, approval routed to a fraud specialist
+curl -s localhost:8000/triage -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d '{"message":"My card was stolen at the airport, call me on 0411 821 692"}'
 
-# 2. Approve it: the action runs and the response includes "effect": "card frozen"
-curl -s localhost:8000/approvals/1/decision -H 'content-type: application/json' \
-  -d '{"approve": true, "reviewer": "fraud-specialist-1"}'
+# 2. The fraud specialist sees it and approves; the card block runs exactly once
+curl -s localhost:8000/approvals/mine -H "Authorization: Bearer $FRAUD"
+curl -s localhost:8000/approvals/1/decision -H "Authorization: Bearer $FRAUD" -H 'content-type: application/json' -d '{"approve":true}'
 
-# 3. Replay what happened
-curl -s localhost:8000/audit
+# 3. Officer asks the copilot about restricted policy: referred to the hardship queue, never shown the content
+curl -s localhost:8000/copilot -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"question":"What hardship arrangement options can we offer?"}'
+
+# 4. Only managers and compliance can read the audit trail
+curl -s localhost:8000/audit -H "Authorization: Bearer $MGR"
 ```
 
-### API
+## Optional services
 
-| Method | Path | Purpose |
+| Profile | Service | Use |
 |---|---|---|
-| `GET` | `/health` | Liveness |
-| `POST` | `/triage` | `{"message": "..."}` returns status (`completed`, `pending_approval` or `blocked`), result, model used, failed models, redactions, approval id |
-| `GET` | `/approvals` | Pending approvals |
-| `POST` | `/approvals/{id}/decision` | `{"approve": bool, "reviewer": "..."}`; runs the action if approved; `409` if already decided |
-| `GET` | `/audit` | Full audit trail |
+| `tracing` | Jaeger (`:16686`) | `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` → see each request's spans |
+| `auth` | Keycloak (`:8080`, realm `wattle`) | `AGENTOPS_JWKS_URL=http://localhost:8080/realms/wattle/protocol/openid-connect/certs` ([deploy/keycloak](deploy/keycloak/README.md)) |
+| `temporal` | Temporal dev server (`:7233`, UI `:8233`) | `uv run python evals/temporal_restart_drill.py` |
+| `live` | LiteLLM gateway (`:4000`) | `AGENTOPS_MODE=live` with provider keys in `.env` (see `.env.example`) |
 
-### Configuration
+`docker compose -f deploy/docker-compose.yml --profile <name> up -d`
+
+## Configuration
 
 | Variable | Default | Effect |
 |---|---|---|
-| `AGENTOPS_MODE` | offline | `live` calls the routed provider models instead of the offline stand-in |
-| `AGENTOPS_DB` | unset (in memory) | Path to a SQLite file for the audit log |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | Send traces over OTLP/HTTP (e.g. `http://localhost:4318` for Jaeger); needs `pip install -e ".[otlp]"` |
+| `AGENTOPS_MODE` | `offline` | `live` sends model calls through LiteLLM |
+| `AGENTOPS_DATABASE_URL` | `postgresql://agentops:agentops@localhost:5433/agentops` | Postgres (on AWS: `AGENTOPS_DB_SECRET_ARN` + `AGENTOPS_DB_HOST` instead) |
+| `AGENTOPS_JWKS_URL`, `AGENTOPS_JWT_AUDIENCE`, `AGENTOPS_JWT_ISSUER` | unset / `agentops-api` / unset | RS256 tokens from Keycloak or Cognito; unset = dev HS256 tokens |
+| `AGENTOPS_CASE_SOURCE` | `static` | `mcp` = cases from MCP Case Tools (`uv pip install -e ../mcp-case-tools`) |
+| `AGENTOPS_PROMPT_TRIAGE_MAJOR` | `1` | Feature flag: switch prompt version without a deploy |
+| `AGENTOPS_POLICY_FILE` | `policies/rules.yaml` | Feature flag: trial a new rule set |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | Export traces (Jaeger, Langfuse, ADOT) |
 
-To view traces locally:
+## Evals and reports
 
-```bash
-docker run -d -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one
-pip install -e ".[otlp]"
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 uvicorn agentops.api:app
-# open http://localhost:16686
-```
-
-## The eval gate
-
-`evals/run_evals.py` runs every case in `evals/golden.jsonl` through the full pipeline and fails the build if any threshold is missed:
-
-| Metric | Threshold | Why |
+| Script | Writes | Question it answers |
 |---|---|---|
-| Category accuracy | 0.9 | Messages reach the right queue |
-| Escalation recall | **1.0** | A fraud, hardship, dispute or complaint case that skips human review is the failure that matters most |
-| Injection block rate | 1.0 | Known attack phrasings never reach the agent |
-
-Four cases are tagged `paraphrase`. They describe fraud, hardship or disputes without any keyword the offline rules know (e.g. "someone used my card without permission"). The offline model fails all four, which would drop escalation recall to 0.76. They are reported on every run but only count towards the gate in live mode. Adding their words to the rules would make the number pass without making the system better.
+| `evals/run_evals.py --report` | `docs/evals/<version>-<mode>.md` | Is this change safe to ship? (7 metrics) |
+| `evals/baseline.py` | `docs/evals/baseline-<mode>.md` | Run-to-run spread, cost per tier, outage behaviour |
+| `evals/replay.py` | stdout | Do the rules do the right thing over a customer's lifecycle? |
+| `evals/rag_compare.py` | `docs/evals/rag-comparison.md` | Keyword vs vector vs hybrid; any leaks? |
+| `evals/guard_metrics.py` | `docs/evals/guards.md` | Guard precision, recall, false positives, latency |
+| `evals/judge_calibration.py` | `docs/evals/judge-calibration.md` | Can we trust an automated judge? |
+| `evals/set_size.py` | `docs/evals/set-size.md` | How noisy is a small eval set? |
+| `evals/drift_report.py` | `docs/evals/drift.md` | Has the population moved away from training? |
+| `evals/shadow.py` | stdout | What would change if we switched config? |
+| `evals/oversight.py` | stdout | Are approvers reviewing or rubber-stamping? |
+| `benchmarks/run.py` | `docs/evals/framework-benchmark.md` | PydanticAI vs LangGraph on the same task |
 
 ## Honest scope
 
-- **Offline mode (default):** a deterministic, rule-based stand-in model runs the real tool-calling and structured-output path, so CI needs no API keys. Offline scores prove the *pipeline and gating*, not model quality.
-- **Live mode:** `AGENTOPS_MODE=live` plus provider credentials runs the routed models through PydanticAI. No live baseline has been recorded yet.
-- **Approvals are in memory.** The audit log is in memory or SQLite. Its append-only property is a convention, not enforced.
-- **Approved actions are fakes** (they return a string). There are no idempotency keys and no separation of duties yet.
-- **The injection check is a speed bump.** It catches known phrasings and cheap obfuscation, not paraphrase. Least privilege on tools is the real defence.
-
-## Roadmap
-
-Phases from [project.md](project.md). Each one ends with tests, recorded eval numbers, an ADR and a demo script.
-
-| Phase | Scope |
-|---|---|
-| 0 | Postgres in docker-compose, persistent approvals and audit, LiteLLM, synthetic data generator, uv/ruff/mypy/pre-commit, data contracts, **live baseline report** |
-| 1 | Decision service: YAML rules, customer flags, lifecycle, reason codes, risk model |
-| 2 | Identity-aware hybrid RAG on pgvector, with entitlement filtering and leak tests |
-| 3 | Evals, red-team set, indirect injection, Langfuse, versioned prompts |
-| 4 | Copilot UI, Keycloak roles, MCP Case Tools integration, Postgres approval state machine, idempotency keys |
-| 5–7 (stretch) | Temporal, AWS (EKS, Bedrock, CloudFormation), framework benchmark |
+- **Offline by default.** A deterministic rule-based stand-in drives the real agent loop, so CI needs no keys. Offline scores prove pipeline and gating, **not model quality**. No live baseline has been recorded yet (it needs provider credentials).
+- **AWS is written and validated, not deployed.** cfn-lint, Checkov, kubeconform, Trivy and shellcheck all pass; deploying needs your account and costs money ([docs/aws.md](docs/aws.md)).
+- **Not wired:** the API still uses the Postgres timer worker, not Temporal; actions run against an in-repo fake ledger, not MCP's `execute_action`; Langfuse and Ragas aren't set up.
+- **Synthetic everything.** Wattle Bank, its policies, customers and thresholds are invented. Verify real regulatory obligations before reusing any rule.
+- Accepted risks are listed in [docs/threat-model.md](docs/threat-model.md).
 
 ## Related
 
-[MCP Case Tools](../mcp-case-tools): an MCP server exposing case tools with least-privilege roles, an enforced workflow and an audit trail. Planned as this agent's tool layer in Phase 4.
+[MCP Case Tools](../mcp-case-tools): an MCP server with least-privilege roles, two workflow profiles (regulator, Wattle Bank), idempotency keys and an audit trail.

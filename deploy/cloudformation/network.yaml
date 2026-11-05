@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AgentOps network: VPC with public subnets (ALB, NAT) and private subnets (EKS nodes, RDS),
+  plus VPC endpoints so traffic to Bedrock, ECR and Secrets Manager stays on the AWS network.
+# LEARNING NOTES
+# - Workloads live in PRIVATE subnets: no public IPs, reachable only via the ALB.
+# - One NAT gateway (not one per AZ) to keep a demo cheap. Production: one per AZ, or a NAT outage
+#   in one AZ takes outbound traffic down for the whole cluster.
+# - Interface endpoints cost money per hour per AZ; they're here because "model calls never leave
+#   the AWS network" is a common bank requirement. The S3 gateway endpoint is free.
+
+Parameters:
+  Env: { Type: String, AllowedPattern: "[a-z0-9-]+", Default: demo }
+  VpcCidr: { Type: String, Default: 10.40.0.0/16 }
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: [{ Key: Name, Value: !Sub "agentops-${Env}" }]
+
+  InternetGateway: { Type: AWS::EC2::InternetGateway }
+  GatewayAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref InternetGateway }
+
+  PublicA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 12]]
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags: [{ Key: kubernetes.io/role/elb, Value: "1" }]   # ALB controller discovers subnets by tag
+  PublicB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 4, 12]]
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags: [{ Key: kubernetes.io/role/elb, Value: "1" }]
+  PrivateA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 4, 12]]
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags: [{ Key: kubernetes.io/role/internal-elb, Value: "1" }]
+  PrivateB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 4, 12]]
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags: [{ Key: kubernetes.io/role/internal-elb, Value: "1" }]
+
+  PublicRoutes: { Type: AWS::EC2::RouteTable, Properties: { VpcId: !Ref Vpc } }
+  PublicDefault:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttach
+    Properties: { RouteTableId: !Ref PublicRoutes, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref InternetGateway }
+  PublicAAssoc: { Type: AWS::EC2::SubnetRouteTableAssociation, Properties: { SubnetId: !Ref PublicA, RouteTableId: !Ref PublicRoutes } }
+  PublicBAssoc: { Type: AWS::EC2::SubnetRouteTableAssociation, Properties: { SubnetId: !Ref PublicB, RouteTableId: !Ref PublicRoutes } }
+
+  NatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttach
+    Properties: { Domain: vpc }
+  Nat:
+    Type: AWS::EC2::NatGateway
+    Properties: { AllocationId: !GetAtt NatEip.AllocationId, SubnetId: !Ref PublicA }
+
+  PrivateRoutes: { Type: AWS::EC2::RouteTable, Properties: { VpcId: !Ref Vpc } }
+  PrivateDefault:
+    Type: AWS::EC2::Route
+    Properties: { RouteTableId: !Ref PrivateRoutes, DestinationCidrBlock: 0.0.0.0/0, NatGatewayId: !Ref Nat }
+  PrivateAAssoc: { Type: AWS::EC2::SubnetRouteTableAssociation, Properties: { SubnetId: !Ref PrivateA, RouteTableId: !Ref PrivateRoutes } }
+  PrivateBAssoc: { Type: AWS::EC2::SubnetRouteTableAssociation, Properties: { SubnetId: !Ref PrivateB, RouteTableId: !Ref PrivateRoutes } }
+
+  EndpointSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS from inside the VPC to interface endpoints
+      VpcId: !Ref Vpc
+      SecurityGroupIngress: [{ IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: !Ref VpcCidr, Description: VPC to endpoints }]
+      SecurityGroupEgress: [{ IpProtocol: "-1", CidrIp: 127.0.0.1/32, Description: no egress needed }]
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcEndpointType: Gateway
+      RouteTableIds: [!Ref PrivateRoutes]
+  BedrockEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.bedrock-runtime
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref PrivateA, !Ref PrivateB]
+      SecurityGroupIds: [!Ref EndpointSg]
+  EcrApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.api
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref PrivateA, !Ref PrivateB]
+      SecurityGroupIds: [!Ref EndpointSg]
+  EcrDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.dkr
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref PrivateA, !Ref PrivateB]
+      SecurityGroupIds: [!Ref EndpointSg]
+  SecretsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.secretsmanager
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref PrivateA, !Ref PrivateB]
+      SecurityGroupIds: [!Ref EndpointSg]
+
+Outputs:
+  VpcId: { Value: !Ref Vpc }
+  VpcCidr: { Value: !Ref VpcCidr }
+  PublicSubnets: { Value: !Join [",", [!Ref PublicA, !Ref PublicB]] }
+  PrivateSubnets: { Value: !Join [",", [!Ref PrivateA, !Ref PrivateB]] }

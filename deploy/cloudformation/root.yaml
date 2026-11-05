@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AgentOps root stack (nested): network -> app (EKS, ECR) -> data (RDS) -> identity (Cognito, Pod Identity roles).
+  Deploy with deploy/aws/deploy.sh; tear down with deploy/aws/destroy.sh.
+# LEARNING NOTE: nested stacks split one big template into reviewable pieces with explicit inputs and
+# outputs. The order is forced by dependencies: RDS needs the EKS security group; Pod Identity roles need
+# the DB secret and the cluster.
+
+Parameters:
+  Env: { Type: String, Default: demo, AllowedPattern: "[a-z0-9-]+" }
+  DeployerRoleArn: { Type: String }
+  BedrockModelArns: { Type: CommaDelimitedList }
+  KubernetesVersion: { Type: String, Default: "1.33" }
+
+Resources:
+  Network:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: network.yaml
+      Parameters: { Env: !Ref Env }
+  App:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: app.yaml
+      Parameters:
+        Env: !Ref Env
+        PrivateSubnets: !GetAtt Network.Outputs.PrivateSubnets
+        DeployerRoleArn: !Ref DeployerRoleArn
+        KubernetesVersion: !Ref KubernetesVersion
+  Data:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: data.yaml
+      Parameters:
+        Env: !Ref Env
+        VpcId: !GetAtt Network.Outputs.VpcId
+        PrivateSubnets: !GetAtt Network.Outputs.PrivateSubnets
+        AppSecurityGroupId: !GetAtt App.Outputs.ClusterSecurityGroupId
+  Identity:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: identity.yaml
+      Parameters:
+        Env: !Ref Env
+        ClusterName: !GetAtt App.Outputs.ClusterName
+        DbSecretArn: !GetAtt Data.Outputs.DbSecretArn
+        BedrockModelArns: !Join [",", !Ref BedrockModelArns]
+
+Outputs:
+  ClusterName: { Value: !GetAtt App.Outputs.ClusterName }
+  RepositoryUri: { Value: !GetAtt App.Outputs.RepositoryUri }
+  DbEndpoint: { Value: !GetAtt Data.Outputs.DbEndpoint }
+  DbSecretArn: { Value: !GetAtt Data.Outputs.DbSecretArn }
+  JwksUrl: { Value: !GetAtt Identity.Outputs.JwksUrl }
+  AppClientId: { Value: !GetAtt Identity.Outputs.AppClientId }

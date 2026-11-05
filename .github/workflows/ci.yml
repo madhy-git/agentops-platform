@@ -1,14 +1,35 @@
+# CI: lint, type-check, test and eval-gate every push.
+#
+# LEARNING NOTES
+# - Postgres runs as a *service container*, so integration tests hit the same engine as prod.
+# - The eval gate is a separate step so a failure says "quality dropped", not just "tests failed".
+# - Offline mode: no provider keys in CI. Live baselines run separately (workflow_dispatch).
 name: ci
 on: [push, pull_request]
+
 jobs:
   test-and-eval-gate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env: { POSTGRES_USER: agentops, POSTGRES_PASSWORD: agentops, POSTGRES_DB: agentops }
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agentops" --health-interval 2s --health-retries 30
+    env:
+      AGENTOPS_DATABASE_URL: postgresql://agentops:agentops@localhost:5433/agentops
+      PYDANTIC_AI_NO_BANNER: "1"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install -e ".[dev]"
-      - run: pytest -q
+      - uses: astral-sh/setup-uv@v6
+        with: { enable-cache: true }
+      - run: uv sync --all-extras --locked
+      - name: Lint and format check
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Type check
+        run: uv run mypy
+      - name: Tests
+        run: uv run pytest -q
       - name: Eval gate (fails the build if quality drops)
-        run: python evals/run_evals.py
-        env: { PYDANTIC_AI_NO_BANNER: "1", PYTHONPATH: src }
+        run: uv run python evals/run_evals.py

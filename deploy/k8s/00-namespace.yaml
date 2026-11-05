@@ -1,0 +1,40 @@
+# LEARNING NOTE: Pod Security Admission "restricted" rejects pods that run as root, mount host paths or
+# keep Linux capabilities. Every deployment below is written to pass it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentops
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+# One service account per workload. identity.yaml binds each to its own IAM role (EKS Pod Identity).
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: agentops-api, namespace: agentops }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: agentops-worker, namespace: agentops }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: agentops-litellm, namespace: agentops }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: adot-collector, namespace: agentops }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: agentops-config, namespace: agentops }
+data:
+  AGENTOPS_MODE: live
+  AGENTOPS_DB_HOST: "${DB_HOST}"
+  AGENTOPS_DB_SECRET_ARN: "${DB_SECRET_ARN}"
+  AGENTOPS_JWKS_URL: "${JWKS_URL}"
+  AGENTOPS_JWT_AUDIENCE: "${APP_CLIENT_ID}"
+  AGENTOPS_JWT_ISSUER: "${JWT_ISSUER}"
+  LITELLM_BASE_URL: http://litellm.agentops.svc.cluster.local:4000/v1
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://adot-collector.agentops.svc.cluster.local:4318
+  HF_HOME: /tmp/hf
