@@ -32,7 +32,7 @@ jobs:
       - name: SBOM (CycloneDX)
         uses: aquasecurity/trivy-action@0.28.0
         with: { image-ref: "agentops:${{ github.sha }}", format: cyclonedx, output: sbom.cdx.json }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: sbom, path: sbom.cdx.json }
 
   secrets:
