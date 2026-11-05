@@ -21,7 +21,7 @@ jobs:
       AGENTOPS_DATABASE_URL: postgresql://agentops:agentops@localhost:5433/agentops
       PYDANTIC_AI_NO_BANNER: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
         with: { enable-cache: true }
       - run: uv sync --all-extras --locked
