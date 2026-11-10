@@ -19,7 +19,7 @@ jobs:
       - name: Checkov
         run: checkov -d deploy/cloudformation --framework cloudformation --compact --quiet
       - name: kubeconform
-        run: docker run --rm -v "$PWD/deploy/k8s:/m:ro" ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary /m
+        run: docker run --rm -v "$PWD/deploy/k8s:/m:ro" ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary -ignore-filename-pattern 'kustomization\.yaml' /m
 
   image:
     runs-on: ubuntu-latest

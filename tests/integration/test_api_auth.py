@@ -58,3 +58,13 @@ def test_end_to_end_roles_through_the_api(client):
     # A manager can read the audit trail, including the officer's denied attempt.
     events = client.get("/audit", headers=h("manager-1", "manager")).json()
     assert any(e["event"] == "action_denied" and e["reason_code"] == "APPROVAL_NOT_PERMITTED" for e in events)
+
+
+def test_ready_reports_a_dead_database_connection(conn):
+    # Regression: after Postgres restarted in the local cluster, /health said 200 while every real request
+    # failed. /ready (used by the k8s probes) must notice, so Kubernetes restarts the pod.
+    app = TestClient(create_app(conn))
+    assert app.get("/ready").status_code == 200
+    conn.close()  # stands in for "the database went away under us"
+    assert app.get("/ready").status_code == 503
+    assert app.get("/health").status_code == 200  # /health alone would have hidden it

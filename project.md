@@ -252,7 +252,7 @@ OpenTelemetry -> Langfuse; eval gate, red-team set and lifecycle replay in CI
 | Evals run as a CI gate (category accuracy, escalation recall, injection block rate) | A change cannot ship if safety-critical recall drops |
 
 ### Results (built)
-All eight phases have a minimal working version (see `../LEARNING_TRACKER.md` for status and findings per phase). 114 tests pass (unit, contract, integration, replay). The 7-metric eval gate passes offline on a 30-case golden set (4 paraphrase cases gate only in live mode). Replay (S6) is 100%; S3, S4, S5, S7, S8 and S9 have passing tests. AWS infrastructure is validated (cfn-lint, Checkov, kubeconform, Trivy) but not deployed. No live-model baseline yet.
+All eight phases have a minimal working version (see `../LEARNING_TRACKER.md` for status and findings per phase). 116 tests pass (unit, contract, integration, replay). The 7-metric eval gate passes offline on a 30-case golden set (4 paraphrase cases gate only in live mode). Replay (S6) is 100%; S3, S4, S5, S7, S8 and S9 have passing tests. AWS infrastructure is validated (cfn-lint, Checkov, kubeconform, Trivy) but not deployed to AWS; the same manifests run on local Kubernetes (`deploy/k8s-local`, smoke test 12/12). No live-model baseline yet.
 
 ### Limits
 - Default mode uses a deterministic offline model so CI needs no API keys. Its eval scores prove the pipeline and gate, not model quality. Run `AGENTOPS_MODE=live` with provider credentials for real quality numbers.

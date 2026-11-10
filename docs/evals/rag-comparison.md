@@ -15,4 +15,3 @@
 | hybrid@1200 | 7 | 0.95 | 0.85 | 1.00 | 0.89 | 0.00 |
 
 **Leaks: 0**. Entitlement filter held in every configuration.
-

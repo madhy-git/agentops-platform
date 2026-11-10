@@ -69,7 +69,7 @@ The **copilot** (`POST /copilot/stream`) is a second, simpler path: redact → i
 | `tests/integration/` | Real Postgres (scratch schema per test), API, Temporal | all | `test_pipeline.py` |
 | `tests/replay/` | Lifecycle journeys (scenario S6) | 1 | `test_journeys.py` |
 | `ui/` | Streamlit client (thin; the server checks everything) | 4 | `app.py` |
-| `deploy/` | docker-compose, LiteLLM, Keycloak, CloudFormation, Kubernetes, AWS scripts | 0, 4, 6 | `docker-compose.yml` |
+| `deploy/` | docker-compose, LiteLLM, Keycloak, CloudFormation, Kubernetes base (`k8s/`) + local overlay (`k8s-local/`), AWS scripts | 0, 4, 6 | `docker-compose.yml`, then `k8s-local/kustomization.yaml` |
 | `docs/adr/` | Why each choice was made (and two deviations from project.md) | all | `0002`, `0005`, `0009` |
 | `docs/evals/` | Generated reports: baseline, gate, RAG, guards, judge, drift, benchmark | 0–7 | `0.3.0-offline.md` |
 | `docs/runbooks/`, `docs/incidents/` | What to do at 3 a.m.; one drill postmortem | 4 | `incidents/...drill.md` |

@@ -23,8 +23,10 @@ spec:
           resources:
             requests: { cpu: 250m, memory: 768Mi }   # embedding model ~300 MB in memory
             limits: { memory: 1536Mi }
-          readinessProbe: { httpGet: { path: /health, port: 8000 }, periodSeconds: 5 }
-          livenessProbe: { httpGet: { path: /health, port: 8000 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          # Both probes use /ready (runs SELECT 1), not /health: a pod whose DB connection died must stop getting
+          # traffic (readiness) and be restarted to reconnect (liveness: ~60 s of failures). Found by killing Postgres.
+          readinessProbe: { httpGet: { path: /ready, port: 8000 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /ready, port: 8000 }, initialDelaySeconds: 60, periodSeconds: 20, failureThreshold: 3 }
           volumeMounts:
             - { name: tmp, mountPath: /tmp }   # the only writable path; the embedding model is baked into the image
       volumes:

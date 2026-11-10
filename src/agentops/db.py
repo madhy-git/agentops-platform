@@ -63,6 +63,29 @@ def scratch_schema(prefix: str = "scratch") -> Iterator[Conn]:
         admin.close()
 
 
+# Any fixed 64-bit number works as an advisory-lock key; every process that runs start-up work must use the same one.
+STARTUP_LOCK_KEY = 0x4147_454E_544F_5053  # "AGENTOPS" in hex, so it's recognisable in pg_locks
+
+
+@contextmanager
+def startup_lock(conn: Conn) -> Iterator[None]:
+    """Serialise start-up work (migrations, corpus ingestion) across every pod sharing this database.
+
+    LEARNING NOTES
+    - Found when moving to Kubernetes: 2 API replicas + 1 worker all start at once, and migrate() and
+      ensure_ingested() are check-then-act ("is it applied? no -> apply"). Without a lock, two pods both
+      see "not applied" and both try (duplicate-key errors, or a crash loop on first deploy).
+    - A Postgres *advisory* lock is a named mutex in the database itself: no extra infrastructure, and it
+      is released automatically if the pod dies (the session ends), so a crash can't leave it stuck.
+    - The second pod waits, then finds the work already done and skips it. Start-up stays idempotent.
+    """
+    conn.execute("SELECT pg_advisory_lock(%s)", (STARTUP_LOCK_KEY,))
+    try:
+        yield
+    finally:
+        conn.execute("SELECT pg_advisory_unlock(%s)", (STARTUP_LOCK_KEY,))
+
+
 def migrate(conn: Conn) -> list[str]:
     """Apply any migration files not yet recorded. Returns the names applied this call."""
     conn.execute("CREATE EXTENSION IF NOT EXISTS vector")

@@ -32,6 +32,105 @@ agentops-platform/            (workspace folder, not a repo)
 └── LEARNING_TRACKER.md       ← exercises and progress; only you mark items [x]
 ```
 
+## Architecture
+
+### System components
+
+Solid arrows are the default path. Dotted arrows are optional; each is switched on by a compose profile or an env var.
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        UI["Streamlit UI<br/>ui/app.py"]
+        CLI["curl / API clients"]
+    end
+
+    IDP["Identity provider<br/>dev HS256 · Keycloak · Cognito"]
+
+    subgraph App["agentops-platform (FastAPI)"]
+        API["api.py + auth.py<br/>JWT → Principal(user, roles)"]
+        subgraph Pipeline["service.py: triage pipeline"]
+            GR["guardrails.py<br/>PII redaction · injection"]
+            RT["router.py + resilience.py<br/>tier choice · fallback · breaker"]
+            AG["agent.py (PydanticAI)<br/>typed TriageResult + tools"]
+            DS["decision/<br/>rules R1–R7 · flags · risk"]
+            WF["workflow/<br/>cases · approvals · actions"]
+        end
+        CP["copilot.py + memory.py<br/>cited, streamed answers"]
+        RAG["rag/<br/>keyword · vector · hybrid<br/>role filter in SQL"]
+    end
+
+    WK["Timer worker<br/>workflow/timers.py"]
+    TMP["Temporal<br/>temporal_approval.py"]
+    LLM["LiteLLM gateway<br/>tier1 · tier2 · tier3"]
+    OFF["Offline model<br/>(default, CI)"]
+    PROV["Model providers<br/>Anthropic (Bedrock on AWS)"]
+    MCP["MCP Case Tools<br/>../mcp-case-tools"]
+    PG[("Postgres 17 + pgvector<br/>audit · cases · approvals · flags<br/>policy_chunks · chat_turns · ledger")]
+    OTEL["OpenTelemetry → Jaeger<br/>(ADOT/X-Ray on AWS)"]
+
+    UI --> API
+    CLI --> API
+    IDP -. "JWKS / tokens" .-> API
+    API --> GR --> RT --> AG --> DS --> WF
+    API --> CP
+    AG -- "search_policy" --> RAG
+    CP --> RAG
+    AG -- "lookup_case" --> MCP
+    RT --> OFF
+    RT -. "AGENTOPS_MODE=live" .-> LLM --> PROV
+    RAG --> PG
+    DS --> PG
+    WF --> PG
+    CP --> PG
+    WK -- "remind · escalate<br/>never approve" --> PG
+    WF -. "durable variant" .-> TMP
+    App -. "spans + trace_id" .-> OTEL
+```
+
+**How to read it:**
+
+- **The model never authorises anything.** The agent returns a `TriageResult`, and `decision/` turns it into actions, flags and a decision on whether approval is needed.
+- **Permissions are checked in several independent places:**
+  - the API (`auth.require`)
+  - the approval workflow: separation of duties, checked in code and by a database CHECK constraint
+  - the retrieval SQL `WHERE` clause
+  - MCP Case Tools, separately
+- **One Postgres holds all state** (ADR 0002). Audit rows can only be added; a trigger blocks updates and deletes.
+
+### On AWS (Phase 6, written and validated, not deployed)
+
+```mermaid
+flowchart LR
+    GH["GitHub Actions"] -- "OIDC, short-lived creds" --> ROLE["Deploy role"]
+    GH --> ECR["ECR<br/>immutable tags · scan on push"]
+    USER["Staff"] -- "sign in" --> COG["Cognito<br/>groups = app roles"]
+    USER -- "HTTPS (TLS 1.3)" --> ALB["ALB"]
+
+    subgraph VPC["VPC: private subnets"]
+        subgraph EKS["EKS (restricted pods, default-deny NetworkPolicy)"]
+            APIP["agentops-api"]
+            WKP["agentops-worker<br/>(timer loop)"]
+            LLMP["litellm"]
+            ADOT["adot-collector"]
+        end
+        RDS[("RDS Postgres 17 + pgvector<br/>KMS · managed password")]
+        VPCE["VPC endpoints<br/>Bedrock · ECR · Secrets Manager · S3"]
+    end
+
+    ALB --> APIP
+    APIP --> LLMP
+    APIP --> RDS
+    WKP --> RDS
+    LLMP -- "Pod Identity" --> VPCE --> BR["Bedrock<br/>exact model ARNs"]
+    APIP -- "Pod Identity" --> SM["Secrets Manager"]
+    WKP -- "Pod Identity" --> SM
+    ADOT -- "Pod Identity" --> XR["X-Ray / CloudWatch"]
+    COG -. "JWKS" .-> APIP
+```
+
+The stacks are nested CloudFormation, in `deploy/cloudformation/`: `root.yaml`, which nests `network`, `data`, `identity` and `app`. The manifests are in `deploy/k8s/`. Costs and teardown are in [docs/aws.md](docs/aws.md).
+
 ## How a request flows
 
 ```text
@@ -69,7 +168,7 @@ All eight phases of [project.md](project.md) have a minimal working version.
 | 6 | AWS | Nested CloudFormation (network, data, identity, app), EKS with Pod Identity, RDS, Cognito, Bedrock, hardened Kubernetes manifests, deploy/destroy/smoke scripts, OIDC deploy workflow | cfn-lint, Checkov, kubeconform, Trivy, shellcheck all pass. **Not deployed** |
 | 7 | Variants | Same task in PydanticAI and LangGraph; rules in OPA/Rego | Rego and Python agree on all 2,000 test inputs |
 
-**Status:** 114 tests (unit, contract, integration, replay, Temporal); ruff and mypy clean; eval gate passing offline. MCP Case Tools: 8 tests.
+**Status:** 116 tests (unit, contract, integration, replay, Temporal); ruff and mypy clean; eval gate passing offline. MCP Case Tools: 8 tests.
 
 ### Scenarios from project.md
 
@@ -133,7 +232,7 @@ curl -s localhost:8000/audit -H "Authorization: Bearer $MGR"
 
 | Method and path | Who | What |
 |---|---|---|
-| `GET /health`, `GET /me` | anyone / any token | Liveness; who the token says you are |
+| `GET /health`, `GET /ready`, `GET /me` | anyone / anyone / any token | Process up; can serve (DB reachable, used by k8s probes); who the token says you are |
 | `POST /triage` | staff | Run the full pipeline on a customer message |
 | `GET /approvals/mine` | service-checked | Approvals routed to the caller's domain |
 | `POST /approvals/{id}/decision` | service-checked | Approve or reject (domain and separation of duties enforced) |
@@ -206,6 +305,33 @@ pre-commit run --all-files                            # the same hooks that run 
 | `evals/temporal_restart_drill.py` | stdout | Does an SLA survive real worker downtime? |
 | `benchmarks/run.py` | `docs/evals/framework-benchmark.md` | PydanticAI vs LangGraph on the same task |
 
+## Running on Kubernetes (local)
+
+Runs the same hardened manifests as EKS on Docker Desktop's built-in cluster (Settings → Kubernetes → Enable), free and offline. [deploy/k8s-local/](deploy/k8s-local/kustomization.yaml) is a Kustomize overlay on the `deploy/k8s` base. It swaps RDS for an in-cluster Postgres StatefulSet, Bedrock for the offline model, the ALB for `port-forward`, and Cognito for dev tokens signed with a random per-cluster secret.
+
+```bash
+deploy/k8s-local/up.sh      # build agentops:local, create the Secret once, apply, wait for rollout
+deploy/k8s-local/smoke.sh   # 12 checks in the cluster: auth, S1 stolen card end to end, S3 referral, audit
+kubectl -n agentops port-forward svc/agentops-api 8000:80   # then use the curl demo above
+deploy/k8s-local/down.sh    # delete the namespace (data and secrets included)
+```
+
+```text
+namespace agentops (Pod Security: restricted, default-deny NetworkPolicy)
+├── agentops-api     Deployment ×2   /ready probes (checks the DB), read-only root FS, uid 10001
+├── agentops-worker  Deployment ×1   SLA timers + crash recovery
+└── postgres         StatefulSet ×1  pgvector, 2 Gi PersistentVolume, reachable only from api + worker
+```
+
+The scripts refuse cloud contexts (`*eks*`, `arn:aws*`, …); set `KUBE_CONTEXT` for another local cluster (kind is supported). Docker Desktop doesn't enforce NetworkPolicy, so the policies are applied but not tested locally.
+
+Running it found two bugs that the tests had missed, and both would affect EKS:
+
+1. Replicas raced to migrate the database at start-up. Fixed with an advisory lock.
+2. `/health` returned 200 while the pod's database connection was dead. Probes now use `/ready`.
+
+Details are in the tracker's Phase 6 findings.
+
 ## Deploying to AWS
 
 The AWS stack is written and validated, but **not deployed**: deploying needs your account and costs money. Read [docs/aws.md](docs/aws.md) first (architecture, cost note, teardown).
@@ -234,7 +360,7 @@ evals/                 golden sets, red-team, journeys, and every eval script
 benchmarks/            the same task in PydanticAI and LangGraph
 tests/                 unit, contract, integration, replay
 ui/                    Streamlit client
-deploy/                docker-compose, LiteLLM, Keycloak, CloudFormation, Kubernetes, AWS scripts
+deploy/                docker-compose, LiteLLM, Keycloak, CloudFormation, k8s (EKS base), k8s-local (overlay), AWS scripts
 docs/                  structure, ADRs, threat model, SLOs, release, observability, runbooks, eval reports
 ```
 

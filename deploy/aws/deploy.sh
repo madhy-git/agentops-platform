@@ -63,6 +63,7 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set clusterName="$CLUSTER" --set serviceAccount.name=aws-load-balancer-controller
 
 echo "== 5/5 apply manifests"
-for f in "$HERE"/k8s/*.yaml; do envsubst < "$f" | kubectl apply -f -; done
+# The base is a Kustomize directory (deploy/k8s/kustomization.yaml); render it, then fill ${IMAGE}, ${DB_HOST}, ...
+kubectl kustomize "$HERE/k8s" | envsubst | kubectl apply -f -
 kubectl -n agentops rollout status deploy/agentops-api --timeout=10m
 echo "deployed $IMAGE to $CLUSTER"

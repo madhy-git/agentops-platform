@@ -1,0 +1,15 @@
+# The base: the EKS manifests, exactly as deploy/aws/deploy.sh applies them (it pipes this through envsubst to
+# fill ${IMAGE}, ${DB_HOST}, ...). Overlays such as deploy/k8s-local patch this base instead of copying it.
+#
+# LEARNING NOTE: one hardened base + small overlays means a security fix (say, a tighter securityContext) lands in
+# every environment at once. Copy-pasted manifests per environment drift apart, and the local copy is usually the
+# one nobody hardens.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - 00-namespace.yaml
+  - 10-api.yaml
+  - 20-worker.yaml
+  - 30-litellm.yaml
+  - 40-adot.yaml
+  - 50-network-policy.yaml

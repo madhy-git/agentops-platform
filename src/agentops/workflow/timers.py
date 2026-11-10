@@ -68,7 +68,8 @@ def main(interval_s: float = 30.0) -> None:  # pragma: no cover - long-running l
     from .cases import CaseStore
 
     conn = db.connect()
-    db.migrate(conn)
+    with db.startup_lock(conn):  # the API pods migrate at start-up too; take turns (db.startup_lock)
+        db.migrate(conn)
     audit = AuditLog(conn)
     # On start-up, finish any action a previous crash left half-done (S8), then poll timers (S7).
     recovered = ActionExecutor(conn, audit, CaseStore(conn, audit)).recover()

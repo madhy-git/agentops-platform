@@ -1,0 +1,63 @@
+# Postgres 17 + pgvector inside the cluster: the local stand-in for RDS (deploy/cloudformation/data.yaml).
+#
+# LEARNING NOTES
+# - A StatefulSet, not a Deployment: the pod keeps a stable name (postgres-0) and its own PersistentVolumeClaim,
+#   so a restart reattaches the same data instead of starting empty.
+# - It passes the namespace's "restricted" Pod Security level: runs as uid 999 (the image's postgres user), so the
+#   entrypoint skips its usual root-only chown step; fsGroup makes the volume writable by that user.
+# - The password comes from the agentops-secrets Secret, created once by up.sh with a random value. It's never in
+#   this file or in git. On AWS the same job is done by RDS + Secrets Manager.
+apiVersion: v1
+kind: Service
+metadata: { name: postgres, namespace: agentops }
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 5432, targetPort: 5432 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: postgres, namespace: agentops, labels: { app: postgres } }
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata: { labels: { app: postgres } }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg17   # same image as deploy/docker-compose.yml
+          ports: [{ containerPort: 5432 }]
+          env:
+            - { name: POSTGRES_USER, value: agentops }
+            - { name: POSTGRES_DB, value: agentops }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: agentops-secrets, key: POSTGRES_PASSWORD } } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }   # a subdirectory: the volume root isn't empty
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 1Gi } }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "agentops", "-d", "agentops"] }
+            periodSeconds: 5
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 2Gi } }
+---
+# The base is default-deny; only the app's own pods may reach the database (mirrors the RDS security group).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: postgres-from-app, namespace: agentops }
+spec:
+  podSelector: { matchLabels: { app: postgres } }
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app: agentops-api } } }, { podSelector: { matchLabels: { app: agentops-worker } } }]
+      ports: [{ port: 5432 }]

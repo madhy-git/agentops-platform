@@ -19,6 +19,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
+import psycopg
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -63,11 +64,12 @@ def _role_for_rules(p: Principal) -> str:
 
 
 def create_app(conn: Conn | None = None) -> FastAPI:
-    if conn is None:
-        conn = db.connect()
-        db.migrate(conn)
+    conn = conn or db.connect()
     telemetry.init()
-    ensure_ingested(conn)  # first start: chunk + embed the policy corpus (~10 s, then cached)
+    # One pod at a time: replicas starting together would otherwise race to migrate and ingest (db.startup_lock).
+    with db.startup_lock(conn):
+        db.migrate(conn)  # no-op when already applied (tests pass a freshly migrated scratch schema)
+        ensure_ingested(conn)  # first start: chunk + embed the policy corpus (~10 s, then cached)
     retriever = PgRetriever(conn, audit=AuditLog(conn))
     svc = TriageService(conn, retriever=retriever)
     copilot = Copilot(conn, retriever=retriever)
@@ -76,6 +78,22 @@ def create_app(conn: Conn | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/ready")
+    def ready() -> dict[str, str]:
+        """Can this pod actually serve? Kubernetes' readiness AND liveness probes use this, not /health.
+
+        LEARNING NOTE: found by killing the Postgres pod in the local cluster. The API holds one long-lived
+        connection; after the database restarted, every request failed (AdminShutdown) while /health kept
+        answering 200, so Kubernetes saw a healthy pod and never fixed it. A probe must check what the pod
+        needs to do its job. Failing liveness here restarts the pod, which opens a fresh connection.
+        The fuller fix, not built yet, is a connection pool that reconnects by itself (psycopg_pool).
+        """
+        try:
+            conn.execute("SELECT 1")
+        except psycopg.Error:
+            raise HTTPException(503, "database unavailable") from None
+        return {"status": "ready"}
 
     @app.get("/me")
     def me(p: Principal = Depends(current_principal)) -> dict[str, Any]:

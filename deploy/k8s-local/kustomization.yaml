@@ -1,0 +1,84 @@
+# Local overlay: run the EKS base (deploy/k8s) on a laptop cluster (Docker Desktop, kind, minikube).
+# Apply with deploy/k8s-local/up.sh, which builds the image and creates the Secret first.
+#
+# LEARNING NOTES
+# - Same hardened pods as on AWS (non-root, read-only root FS, no capabilities, restricted Pod Security,
+#   default-deny NetworkPolicy). Only the AWS-shaped parts change:
+#     RDS + Secrets Manager -> in-cluster Postgres + a Kubernetes Secret   (postgres.yaml)
+#     Bedrock via LiteLLM   -> offline model (no keys, no cost)            (LiteLLM removed)
+#     ADOT -> X-Ray         -> no exporter (add Jaeger if you want traces) (ADOT removed)
+#     ALB Ingress + ACM     -> `kubectl port-forward`                      (Ingress removed)
+#     Cognito JWKS          -> dev HS256 tokens, signed with a random per-cluster secret
+# - Reading the patches below is a quick way to see exactly what is cloud-specific in the base.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../k8s
+  - postgres.yaml
+
+patches:
+  # Settings for local: offline model, DB URL and JWT secret come from the Secret (see the Deployment patches).
+  - target: { kind: ConfigMap, name: agentops-config }
+    patch: |-
+      - op: replace
+        path: /data
+        value:
+          AGENTOPS_MODE: offline
+          HF_HOME: /tmp/hf
+
+  # The locally built image. IfNotPresent: Docker Desktop's cluster shares Docker's image store, so no registry.
+  - target: { kind: Deployment, name: agentops-api }
+    patch: |-
+      - { op: replace, path: /spec/template/spec/containers/0/image, value: "agentops:local" }
+      - { op: add, path: /spec/template/spec/containers/0/imagePullPolicy, value: IfNotPresent }
+      - op: add
+        path: /spec/template/spec/containers/0/env
+        value:
+          - { name: AGENTOPS_DATABASE_URL, valueFrom: { secretKeyRef: { name: agentops-secrets, key: AGENTOPS_DATABASE_URL } } }
+          - { name: AGENTOPS_JWT_SECRET, valueFrom: { secretKeyRef: { name: agentops-secrets, key: AGENTOPS_JWT_SECRET } } }
+  - target: { kind: Deployment, name: agentops-worker }
+    patch: |-
+      - { op: replace, path: /spec/template/spec/containers/0/image, value: "agentops:local" }
+      - { op: add, path: /spec/template/spec/containers/0/imagePullPolicy, value: IfNotPresent }
+      - op: add
+        path: /spec/template/spec/containers/0/env
+        value:
+          - { name: AGENTOPS_DATABASE_URL, valueFrom: { secretKeyRef: { name: agentops-secrets, key: AGENTOPS_DATABASE_URL } } }
+          - { name: PYTHONUNBUFFERED, value: "1" }   # so `kubectl logs` shows each tick as it happens
+
+  # AWS-only pieces: removed, not left crash-looping on missing Bedrock / X-Ray / ALB.
+  - patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata: { name: agentops-api, namespace: agentops }
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: { name: litellm, namespace: agentops }
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata: { name: litellm, namespace: agentops }
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: { name: litellm-config, namespace: agentops }
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: { name: adot-collector, namespace: agentops }
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata: { name: adot-collector, namespace: agentops }
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: { name: adot-config, namespace: agentops }
