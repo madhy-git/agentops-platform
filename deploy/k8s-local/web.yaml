@@ -1,0 +1,52 @@
+# The web app (customer portal + staff workspace): nginx serving the React bundle and proxying /api to the API.
+#
+# LEARNING NOTES
+# - type: LoadBalancer. Docker Desktop publishes LoadBalancer services on localhost, so the app is simply at
+#   http://localhost:8088, no port-forward to keep alive (port-forwards die whenever a pod is replaced).
+#   On EKS the same Service type would create a cloud load balancer; there you'd route through the ALB Ingress.
+# - Same hardening as every other pod here: non-root, read-only root filesystem (only /tmp is writable, for
+#   nginx's pid file and temp buffers), no Linux capabilities, restricted Pod Security.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: agentops-web, namespace: agentops }
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: agentops-web, namespace: agentops, labels: { app: agentops-web } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: agentops-web } }
+  template:
+    metadata: { labels: { app: agentops-web } }
+    spec:
+      serviceAccountName: agentops-web
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: web
+          image: agentops-web:local
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8080 }]
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 20m, memory: 32Mi }, limits: { memory: 128Mi } }
+          readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 20 }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: agentops-web, namespace: agentops }
+spec:
+  type: LoadBalancer
+  selector: { app: agentops-web }
+  ports: [{ port: 8088, targetPort: 8080 }]
+---
+# Default-deny applies here too; the web pod takes traffic on 8080 from anyone (it's the public entry point).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: web-public, namespace: agentops }
+spec:
+  podSelector: { matchLabels: { app: agentops-web } }
+  ingress: [{ ports: [{ port: 8080 }] }]

@@ -5,16 +5,20 @@
 # - Same hardened pods as on AWS (non-root, read-only root FS, no capabilities, restricted Pod Security,
 #   default-deny NetworkPolicy). Only the AWS-shaped parts change:
 #     RDS + Secrets Manager -> in-cluster Postgres + a Kubernetes Secret   (postgres.yaml)
-#     Bedrock via LiteLLM   -> offline model (no keys, no cost)            (LiteLLM removed)
+#     Bedrock via LiteLLM   -> Gemini via LiteLLM for the copilot; triage stays offline (no cost, deterministic)
+#                              (key: Secret gemini-api, created by up.sh from your git-ignored .env)
 #     ADOT -> X-Ray         -> no exporter (add Jaeger if you want traces) (ADOT removed)
 #     ALB Ingress + ACM     -> `kubectl port-forward`                      (Ingress removed)
 #     Cognito JWKS          -> dev HS256 tokens, signed with a random per-cluster secret
+#   Plus the web app (web.yaml): customer portal + staff workspace, with demo sign-in (AGENTOPS_DEV_LOGIN=1)
+#   because there is no identity provider locally. The API refuses demo sign-in whenever one is configured.
 # - Reading the patches below is a quick way to see exactly what is cloud-specific in the base.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../k8s
   - postgres.yaml
+  - web.yaml
 
 patches:
   # Settings for local: offline model, DB URL and JWT secret come from the Secret (see the Deployment patches).
@@ -24,6 +28,9 @@ patches:
         path: /data
         value:
           AGENTOPS_MODE: offline
+          AGENTOPS_COPILOT_MODE: live
+          LITELLM_BASE_URL: http://litellm.agentops.svc.cluster.local:4000/v1
+          AGENTOPS_DEV_LOGIN: "1"
           HF_HOME: /tmp/hf
 
   # The locally built image. IfNotPresent: Docker Desktop's cluster shares Docker's image store, so no registry.
@@ -36,6 +43,7 @@ patches:
         value:
           - { name: AGENTOPS_DATABASE_URL, valueFrom: { secretKeyRef: { name: agentops-secrets, key: AGENTOPS_DATABASE_URL } } }
           - { name: AGENTOPS_JWT_SECRET, valueFrom: { secretKeyRef: { name: agentops-secrets, key: AGENTOPS_JWT_SECRET } } }
+          - { name: LITELLM_API_KEY, valueFrom: { secretKeyRef: { name: litellm-master, key: LITELLM_MASTER_KEY } } }
   - target: { kind: Deployment, name: agentops-worker }
     patch: |-
       - { op: replace, path: /spec/template/spec/containers/0/image, value: "agentops:local" }
@@ -52,21 +60,35 @@ patches:
       apiVersion: networking.k8s.io/v1
       kind: Ingress
       metadata: { name: agentops-api, namespace: agentops }
-  - patch: |-
-      $patch: delete
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata: { name: litellm, namespace: agentops }
-  - patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: Service
-      metadata: { name: litellm, namespace: agentops }
-  - patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: ConfigMap
-      metadata: { name: litellm-config, namespace: agentops }
+  # LiteLLM gateway -> Google Gemini (free tier). Models chosen by probing what the key can actually use
+  # (2026-11-11): pro models are quota-blocked on the free tier, gemini-3.8-flash hangs, so tier 3 = tier 2.
+  - target: { kind: ConfigMap, name: litellm-config }
+    patch: |-
+      - op: replace
+        path: /data/config.yaml
+        value: |
+          model_list:
+            - model_name: agentops-tier1
+              litellm_params: { model: gemini/gemini-3.5-flash-lite, api_key: os.environ/GEMINI_API_KEY }
+            # reasoning_effort minimal -> Gemini thinkingLevel "minimal": measured 12 s -> ~2 s to first token for
+            # the copilot, same grounded, cited answer. Retrieval already did the "thinking" (which passages matter).
+            - model_name: agentops-tier2
+              litellm_params: { model: gemini/gemini-3.5-flash, api_key: os.environ/GEMINI_API_KEY, reasoning_effort: minimal }
+            - model_name: agentops-tier3
+              litellm_params: { model: gemini/gemini-3.5-flash, api_key: os.environ/GEMINI_API_KEY }
+          litellm_settings: { drop_params: true, request_timeout: 60 }
+  - target: { kind: Deployment, name: litellm }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }
+      - op: add
+        path: /spec/template/spec/containers/0/env
+        value:
+          # optional: without a key LiteLLM still starts; the copilot then falls back to offline answers
+          - { name: GEMINI_API_KEY, valueFrom: { secretKeyRef: { name: gemini-api, key: GEMINI_API_KEY, optional: true } } }
+          - { name: LITELLM_MASTER_KEY, valueFrom: { secretKeyRef: { name: litellm-master, key: LITELLM_MASTER_KEY } } }
+      - op: add
+        path: /spec/template/spec/containers/0/readinessProbe
+        value: { httpGet: { path: /health/liveliness, port: 4000 }, periodSeconds: 10, initialDelaySeconds: 10 }
   - patch: |-
       $patch: delete
       apiVersion: apps/v1

@@ -18,7 +18,7 @@ from typing import Any
 
 from .db import Conn
 from .guardrails import redact_pii
-from .rag.base import STAFF, Passage
+from .rag.base import STAFF, Passage, held_roles
 
 
 def derived_roles(passages: Iterable[Passage]) -> list[str]:
@@ -48,7 +48,7 @@ class SessionMemory:
 
     def history(self, session_id: str, user: str, roles: Iterable[str]) -> list[dict[str, Any]]:
         """Visible turns for this user, filtered by their roles *now*, most recent last."""
-        held = sorted(set(roles) | {STAFF})
+        held = sorted(held_roles(roles))
         rows = self.conn.execute(
             "SELECT speaker, content, sources FROM chat_turns WHERE session_id=%s AND user_id=%s "
             "AND allowed_roles && %s ORDER BY id DESC LIMIT %s",

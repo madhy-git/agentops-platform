@@ -8,6 +8,8 @@ LEARNING NOTES
   workflow layers, where they are unit-testable.
 - Who you are changes what you can do (Phase 4 done-when): officers triage and ask the copilot;
   specialists approve their own domain; managers approve anything, escalate and read the audit log.
+- Customers use the same API under /portal (portal.py). Staff endpoints require a staff role explicitly;
+  "any valid token" stopped being safe the day customers could get tokens (see /cases/{id}/transition).
 - Note: psycopg here is synchronous, so DB calls inside async endpoints block the event loop.
   Fine for a learning app; production would use an async pool (psycopg AsyncConnectionPool).
 """
@@ -24,18 +26,21 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from . import db, telemetry
+from . import db, personas, telemetry
 from .audit import AuditLog
-from .auth import Principal, current_principal, require
+from .auth import Principal, current_principal, dev_token, require
+from .config import settings
 from .copilot import Copilot, CopilotAnswer
 from .db import Conn
 from .decision.flags import FlagPermissionError
+from .portal import portal_router
 from .rag.pg import PgRetriever, ensure_ingested
 from .service import TriageService
 from .workflow.approvals import ApprovalError
-from .workflow.cases import InvalidTransition
+from .workflow.cases import TRANSITIONS, InvalidTransition
 
 STAFF_ROLES = ("officer", "manager", "fraud_specialist", "hardship_specialist", "disputes_officer")
+READ_ROLES = (*STAFF_ROLES, "compliance")  # may look at cases, but compliance never changes them
 
 
 class TriageRequest(BaseModel):
@@ -58,6 +63,10 @@ class Transition(BaseModel):
     to: str
 
 
+class DevLogin(BaseModel):
+    username: str
+
+
 def _role_for_rules(p: Principal) -> str:
     """The rules distinguish officer vs manager requests (R5). Specialists request as officers."""
     return "manager" if "manager" in p.roles else "officer"
@@ -70,6 +79,7 @@ def create_app(conn: Conn | None = None) -> FastAPI:
     with db.startup_lock(conn):
         db.migrate(conn)  # no-op when already applied (tests pass a freshly migrated scratch schema)
         ensure_ingested(conn)  # first start: chunk + embed the policy corpus (~10 s, then cached)
+        personas.seed_demo_customers(conn)  # the portal's demo customers (idempotent)
     retriever = PgRetriever(conn, audit=AuditLog(conn))
     svc = TriageService(conn, retriever=retriever)
     copilot = Copilot(conn, retriever=retriever)
@@ -97,7 +107,28 @@ def create_app(conn: Conn | None = None) -> FastAPI:
 
     @app.get("/me")
     def me(p: Principal = Depends(current_principal)) -> dict[str, Any]:
-        return {"user": p.user, "roles": sorted(p.roles)}
+        return {"user": p.user, "roles": sorted(p.roles), "customer_id": p.customer_id}
+
+    # --- demo sign-in (personas.py explains the two guards) ---------------------------------------------------
+    def dev_login_enabled() -> bool:
+        s = settings()
+        return s.dev_login and not s.jwt_jwks_url
+
+    @app.get("/auth/personas")
+    def list_personas() -> dict[str, Any]:
+        enabled = dev_login_enabled()
+        return {"enabled": enabled, "personas": [personas.as_dict(x) for x in personas.personas()] if enabled else []}
+
+    @app.post("/auth/dev-login")
+    def dev_login(body: DevLogin) -> dict[str, Any]:
+        if not dev_login_enabled():
+            raise HTTPException(404, "not found")  # don't advertise that a demo login exists
+        who = personas.find(body.username)
+        if who is None:
+            raise HTTPException(401, "unknown demo user")
+        svc.audit.record("dev_login", actor=who.username, roles=list(who.roles))
+        token = dev_token(who.username, list(who.roles), ttl_s=8 * 3600, customer_id=who.customer_id)
+        return {"token": token, "persona": personas.as_dict(who)}
 
     @app.post("/triage")
     def triage(req: TriageRequest, p: Principal = Depends(require(*STAFF_ROLES))) -> dict[str, Any]:
@@ -118,11 +149,20 @@ def create_app(conn: Conn | None = None) -> FastAPI:
         }
 
     @app.get("/approvals/mine")
-    def my_approvals(p: Principal = Depends(current_principal)) -> list[dict[str, Any]]:
-        return svc.approvals.pending_for(p.user, set(p.roles))
+    def my_approvals(p: Principal = Depends(require(*STAFF_ROLES))) -> list[dict[str, Any]]:
+        rows = svc.approvals.pending_for(p.user, set(p.roles))
+        # The approver needs context to decide: what the customer said and who they are (still PII-redacted).
+        for a in rows:
+            case = conn.execute(
+                "SELECT c.summary, c.priority, c.customer_id, cu.name AS customer_name FROM cases c "
+                "LEFT JOIN customers cu USING (customer_id) WHERE c.id = %s",
+                (a["case_id"],),
+            ).fetchone()
+            a.update(case or {})
+        return rows
 
     @app.post("/approvals/{approval_id}/decision")
-    def decide(approval_id: int, d: Decision, p: Principal = Depends(current_principal)) -> dict[str, Any]:
+    def decide(approval_id: int, d: Decision, p: Principal = Depends(require(*STAFF_ROLES))) -> dict[str, Any]:
         try:
             req, effect = svc.decide(approval_id, d.approve, p.user, set(p.roles), d.reason)
         except KeyError:
@@ -133,15 +173,72 @@ def create_app(conn: Conn | None = None) -> FastAPI:
             raise HTTPException(409, str(e)) from e
         return {**req, "effect": effect}
 
+    # --- staff workspace ----------------------------------------------------------------------------------------
+    @app.get("/cases")
+    def list_cases(
+        state: str | None = None, limit: int = 100, p: Principal = Depends(require(*READ_ROLES))
+    ) -> list[dict[str, Any]]:
+        rows = conn.execute(
+            "SELECT c.*, cu.name AS customer_name, a.id AS approval_id, a.status AS approval_status, "
+            "a.assigned_to AS approver, a.sla_due, a.escalated_at FROM cases c "
+            "LEFT JOIN customers cu USING (customer_id) "
+            "LEFT JOIN LATERAL (SELECT * FROM approval_requests ar WHERE ar.case_id = c.id ORDER BY ar.id DESC LIMIT 1) a ON true "
+            "WHERE (%(state)s::text IS NULL OR c.state = %(state)s) ORDER BY c.id DESC LIMIT %(limit)s",
+            {"state": state, "limit": min(max(limit, 1), 500)},
+        ).fetchall()
+        return list(rows)
+
     @app.get("/cases/{case_id}")
-    def get_case(case_id: int, p: Principal = Depends(require(*STAFF_ROLES, "compliance"))) -> dict[str, Any]:
+    def get_case(case_id: int, p: Principal = Depends(require(*READ_ROLES))) -> dict[str, Any]:
         try:
-            return svc.cases.get(case_id)
+            case = svc.cases.get(case_id)
         except KeyError:
             raise HTTPException(404, "unknown case") from None
+        decision = None
+        if case["decision_id"]:
+            row = conn.execute("SELECT result FROM decisions WHERE id = %s", (case["decision_id"],)).fetchone()
+            decision = row["result"] if row else None
+        approvals = conn.execute(
+            "SELECT * FROM approval_requests WHERE case_id = %s ORDER BY id", (case_id,)
+        ).fetchall()
+        customer = None
+        if case["customer_id"]:
+            customer = customer_view(case["customer_id"])
+        # Additive: the original case columns stay at the top level, so older clients keep working.
+        return {**case, "decision": decision, "approvals": list(approvals), "customer": customer,
+                "allowed_transitions": sorted(TRANSITIONS.get(case["state"], set()))}  # fmt: skip
+
+    def customer_view(customer_id: str) -> dict[str, Any] | None:
+        row = conn.execute(
+            "SELECT customer_id, name, lifecycle_stage, vulnerable FROM customers WHERE customer_id = %s",
+            (customer_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {**row, "active_flags": svc.decisions.flags.active(customer_id)}
+
+    @app.get("/customers/{customer_id}")
+    def get_customer(customer_id: str, p: Principal = Depends(require(*READ_ROLES))) -> dict[str, Any]:
+        c = customer_view(customer_id)
+        if c is None:
+            raise HTTPException(404, "unknown customer")
+        return c
+
+    @app.get("/stats")
+    def stats(p: Principal = Depends(require(*READ_ROLES))) -> dict[str, Any]:
+        by_state = {r["state"]: r["n"] for r in conn.execute("SELECT state, count(*) AS n FROM cases GROUP BY state")}
+        row = conn.execute(
+            "SELECT count(*) FILTER (WHERE status = 'pending') AS pending, "
+            "count(*) FILTER (WHERE status = 'pending' AND sla_due < now()) AS overdue, "
+            "count(*) FILTER (WHERE status = 'pending' AND assigned_to = %s) AS mine, "
+            "count(*) FILTER (WHERE status <> 'pending' AND decided_at > now() - interval '24 hours') AS decided_24h "
+            "FROM approval_requests",
+            (p.user,),
+        ).fetchone()
+        return {"cases_by_state": by_state, "approvals": dict(row or {})}
 
     @app.post("/cases/{case_id}/transition")
-    def transition(case_id: int, t: Transition, p: Principal = Depends(current_principal)) -> dict[str, Any]:
+    def transition(case_id: int, t: Transition, p: Principal = Depends(require(*STAFF_ROLES))) -> dict[str, Any]:
         from .decision.service import utcnow
 
         try:
@@ -150,7 +247,7 @@ def create_app(conn: Conn | None = None) -> FastAPI:
             raise HTTPException(409, str(e)) from e
 
     @app.post("/customers/{customer_id}/flags/{flag}/clear")
-    def clear_flag(customer_id: str, flag: str, p: Principal = Depends(current_principal)) -> dict[str, str]:
+    def clear_flag(customer_id: str, flag: str, p: Principal = Depends(require(*STAFF_ROLES))) -> dict[str, str]:
         try:
             svc.decisions.clear_flag(customer_id, flag, p.user, set(p.roles))
         except FlagPermissionError as e:
@@ -184,4 +281,5 @@ def create_app(conn: Conn | None = None) -> FastAPI:
 
         return EventSourceResponse(events())
 
+    app.include_router(portal_router(conn, svc, copilot))
     return app

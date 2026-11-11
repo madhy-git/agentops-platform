@@ -21,9 +21,12 @@ case "$CTX" in
 esac
 k get nodes >/dev/null || { echo "cluster '$CTX' not reachable (Docker Desktop: Settings > Kubernetes > Enable)" >&2; exit 1; }
 
-echo "== 1/4 build image agentops:local"
+echo "== 1/4 build images agentops:local (API + worker) and agentops-web:local (web app)"
 docker build -t agentops:local "$ROOT"
-if [[ "$CTX" == kind-* ]]; then kind load docker-image agentops:local --name "${CTX#kind-}"; fi
+docker build -t agentops-web:local "$ROOT/web"
+if [[ "$CTX" == kind-* ]]; then
+  kind load docker-image agentops:local agentops-web:local --name "${CTX#kind-}"
+fi
 
 echo "== 2/4 namespace + secret"
 k apply -f "$ROOT/deploy/k8s/00-namespace.yaml" >/dev/null
@@ -37,14 +40,30 @@ else
   echo "secret agentops-secrets exists; keeping it"
 fi
 
+# LiteLLM master key: random, created once (the gateway refuses to start without one).
+k -n "$NS" get secret litellm-master >/dev/null 2>&1 || \
+  k -n "$NS" create secret generic litellm-master --from-literal=LITELLM_MASTER_KEY="sk-$(openssl rand -hex 32)" >/dev/null
+
+# Gemini key for the LiteLLM gateway, from the git-ignored .env (never from the command line, so it doesn't show
+# up in `ps` or shell history). Re-applied every run, so editing .env and re-running picks up a new key.
+if grep -q '^GEMINI_API_KEY=.' "$ROOT/.env" 2>/dev/null; then
+  k -n "$NS" create secret generic gemini-api --from-env-file=<(grep '^GEMINI_API_KEY=' "$ROOT/.env") \
+    --dry-run=client -o yaml | k apply -f - >/dev/null
+  echo "gemini-api secret updated from .env"
+else
+  echo "no GEMINI_API_KEY in .env: the copilot will answer with the offline model"
+fi
+
 echo "== 3/4 apply manifests (deploy/k8s base + deploy/k8s-local overlay)"
 k apply -k "$ROOT/deploy/k8s-local"
-k -n "$NS" rollout restart deploy/agentops-api deploy/agentops-worker >/dev/null
+k -n "$NS" rollout restart deploy/agentops-api deploy/agentops-worker deploy/agentops-web deploy/litellm >/dev/null
 
 echo "== 4/4 wait for rollout"
 k -n "$NS" rollout status statefulset/postgres --timeout=3m
 k -n "$NS" rollout status deploy/agentops-api --timeout=5m
 k -n "$NS" rollout status deploy/agentops-worker --timeout=3m
+k -n "$NS" rollout status deploy/agentops-web --timeout=3m
+k -n "$NS" rollout status deploy/litellm --timeout=5m
 k -n "$NS" get pods -o wide
 echo
-echo "deployed. Next: deploy/k8s-local/smoke.sh   (or: kubectl -n $NS port-forward svc/agentops-api 8000:80)"
+echo "deployed. Open http://localhost:8088 (web app). Check it: deploy/k8s-local/smoke.sh"

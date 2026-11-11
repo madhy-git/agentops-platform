@@ -1,8 +1,8 @@
 {
   "properties": {
     "schema_version": {
-      "const": "1.0",
-      "default": "1.0",
+      "const": "1.2",
+      "default": "1.2",
       "title": "Schema Version",
       "type": "string"
     },
@@ -25,7 +25,9 @@
         "action_denied",
         "case_state_changed",
         "case_closed",
-        "copilot_answered"
+        "copilot_answered",
+        "dev_login",
+        "misuse_refused"
       ],
       "title": "Event",
       "type": "string"

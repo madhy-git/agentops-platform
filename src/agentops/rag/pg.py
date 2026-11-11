@@ -14,6 +14,8 @@ LEARNING NOTES
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Iterable
 from typing import Any, Literal
@@ -22,7 +24,7 @@ from pgvector.psycopg import register_vector
 
 from ..audit import AuditLog
 from ..db import Conn
-from .base import STAFF, Passage
+from .base import Passage, held_roles
 from .corpus import Chunk, load_chunks
 from .embeddings import Embedder, default_embedder
 
@@ -30,10 +32,26 @@ Mode = Literal["keyword", "vector", "hybrid"]
 RRF_K = 60  # standard constant from the RRF paper; dampens the advantage of rank 1 vs rank 2
 
 
+def fingerprint(chunks: Iterable[Chunk]) -> str:
+    """A hash of everything that decides what a chunk says AND who may read it."""
+    h = hashlib.sha256()
+    for c in chunks:
+        h.update(
+            json.dumps([c.doc_id, c.chunk_no, c.title, c.classification, sorted(c.allowed_roles), c.text]).encode()
+        )
+    return h.hexdigest()
+
+
 def ensure_ingested(conn: Conn, chunk_size: int = 600) -> int:
-    """Ingest the corpus if this chunk size isn't loaded yet. Returns the number of chunks present."""
-    row = conn.execute("SELECT count(*) AS n FROM policy_chunks WHERE chunk_size = %s", (chunk_size,)).fetchone()
-    return int(row["n"]) if row and row["n"] else ingest(conn, chunk_size=chunk_size)
+    """Ingest the corpus unless exactly this version is already loaded. Returns the number of chunks present.
+
+    Compares a fingerprint, not a row count (migration 005 explains the entitlement bug a count hid).
+    """
+    chunks = load_chunks(max_chars=chunk_size)
+    row = conn.execute("SELECT fingerprint FROM corpus_fingerprints WHERE chunk_size = %s", (chunk_size,)).fetchone()
+    if row and row["fingerprint"] == fingerprint(chunks):
+        return len(chunks)
+    return ingest(conn, chunks, chunk_size=chunk_size)
 
 
 def ingest(
@@ -42,6 +60,7 @@ def ingest(
     """(Re)load the corpus at one chunk size. Embeds every chunk once; idempotent per (size, doc, chunk)."""
     register_vector(conn)
     chunks = chunks if chunks is not None else load_chunks(max_chars=chunk_size)
+    fp = fingerprint(chunks)
     vectors = (embedder or default_embedder()).embed_documents([f"{c.title}\n{c.text}" for c in chunks])
     with conn.transaction(), conn.cursor() as cur:
         cur.execute("DELETE FROM policy_chunks WHERE chunk_size = %s", (chunk_size,))
@@ -52,6 +71,12 @@ def ingest(
                 (c.doc_id, c.chunk_no, c.title, c.classification, list(c.allowed_roles), chunk_size, c.text, v)
                 for c, v in zip(chunks, vectors, strict=True)
             ],
+        )
+        # Same transaction as the chunks: the fingerprint can never claim a version that isn't fully loaded.
+        cur.execute(
+            "INSERT INTO corpus_fingerprints (chunk_size, fingerprint) VALUES (%s, %s) "
+            "ON CONFLICT (chunk_size) DO UPDATE SET fingerprint = EXCLUDED.fingerprint, ingested_at = now()",
+            (chunk_size, fp),
         )
     return len(chunks)
 
@@ -89,7 +114,12 @@ class PgRetriever:
         # charge" would only match chunks containing *all* those words. OR the terms instead and let
         # ts_rank reward chunks that match more of them. (Stop words are dropped by Postgres.)
         terms = re.findall(r"[A-Za-z0-9]{3,}", query)
-        return {"query": " or ".join(terms) or query, "roles": sorted(roles | {STAFF}), "k": k, "size": self.chunk_size}
+        return {
+            "query": " or ".join(terms) or query,
+            "roles": sorted(held_roles(roles)),
+            "k": k,
+            "size": self.chunk_size,
+        }
 
     def _rows(self, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         return self.conn.execute(sql, params).fetchall()
@@ -154,8 +184,23 @@ class PgRetriever:
 
     def hidden_roles(self, query: str, roles: Iterable[str]) -> set[str]:
         """Which roles could see relevant matches the caller can't. Metadata only: used to pick a queue."""
-        held = sorted(set(roles) | {STAFF})
+        held = sorted(held_roles(roles))
         return {r for row in self._hidden_rows(query, held) for r in row["allowed_roles"]}
 
+    def hidden_matches(self, query: str, roles: Iterable[str]) -> list[tuple[float, list[str]]]:
+        """(score, allowed_roles) of relevant chunks the caller can't see. Scores and roles only, never content.
+
+        The copilot needs the *score* to tell "the restricted doc is the best answer" (refer) from "a restricted
+        doc is vaguely related" (don't): see copilot.MARGIN.
+        """
+        held = sorted(held_roles(roles))
+        vec = self.embedder.embed_query(query)
+        rows = self._rows(
+            "SELECT allowed_roles, 1 - (embedding <=> %(vec)s::vector) AS score FROM policy_chunks "
+            "WHERE chunk_size = %(size)s AND NOT (allowed_roles && %(roles)s) AND 1 - (embedding <=> %(vec)s::vector) >= %(min)s",
+            {"size": self.chunk_size, "roles": held, "vec": vec, "min": self.HIDDEN_MIN_SCORE},
+        )
+        return [(float(r["score"]), list(r["allowed_roles"])) for r in rows]
+
     def hidden_count(self, query: str, roles: Iterable[str]) -> int:
-        return len(self._hidden_rows(query, sorted(set(roles) | {STAFF})))
+        return len(self._hidden_rows(query, sorted(held_roles(roles))))

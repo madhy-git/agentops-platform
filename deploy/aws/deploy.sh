@@ -63,6 +63,10 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set clusterName="$CLUSTER" --set serviceAccount.name=aws-load-balancer-controller
 
 echo "== 5/5 apply manifests"
+# Gateway master key: created once, random, never in git or a manifest. Rotating = delete the secret, re-run.
+kubectl get ns agentops >/dev/null 2>&1 || kubectl create ns agentops
+kubectl -n agentops get secret litellm-master >/dev/null 2>&1 || \
+  kubectl -n agentops create secret generic litellm-master --from-literal=LITELLM_MASTER_KEY="sk-$(openssl rand -hex 32)"
 # The base is a Kustomize directory (deploy/k8s/kustomization.yaml); render it, then fill ${IMAGE}, ${DB_HOST}, ...
 kubectl kustomize "$HERE/k8s" | envsubst | kubectl apply -f -
 kubectl -n agentops rollout status deploy/agentops-api --timeout=10m

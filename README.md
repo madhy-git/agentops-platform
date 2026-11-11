@@ -168,7 +168,7 @@ All eight phases of [project.md](project.md) have a minimal working version.
 | 6 | AWS | Nested CloudFormation (network, data, identity, app), EKS with Pod Identity, RDS, Cognito, Bedrock, hardened Kubernetes manifests, deploy/destroy/smoke scripts, OIDC deploy workflow | cfn-lint, Checkov, kubeconform, Trivy, shellcheck all pass. **Not deployed** |
 | 7 | Variants | Same task in PydanticAI and LangGraph; rules in OPA/Rego | Rego and Python agree on all 2,000 test inputs |
 
-**Status:** 116 tests (unit, contract, integration, replay, Temporal); ruff and mypy clean; eval gate passing offline. MCP Case Tools: 8 tests.
+**Status:** 141 tests (unit, contract, integration, replay, Temporal); ruff and mypy clean; eval gate passing offline. MCP Case Tools: 8 tests.
 
 ### Scenarios from project.md
 
@@ -305,19 +305,53 @@ pre-commit run --all-files                            # the same hooks that run 
 | `evals/temporal_restart_drill.py` | stdout | Does an SLA survive real worker downtime? |
 | `benchmarks/run.py` | `docs/evals/framework-benchmark.md` | PydanticAI vs LangGraph on the same task |
 
+## Web app: customer portal + staff workspace
+
+A React + TypeScript + Tailwind app in [web/](web/src/App.tsx). There's no sign-in screen: open it and choose a side.
+
+| Side | Who | What they can do |
+|---|---|---|
+| **Customer portal** (`/portal`) | Wattle Bank customers (Jordan, Priya, Noah) | Raise a request (lost card, dispute, hardship, complaint), track it step by step, ask the help assistant (customer articles only) |
+| **Staff workspace** (`/staff`) | Officer, fraud/hardship specialists, disputes, manager, compliance | Live dashboard, case queue and detail (rules decision, flags), **My approvals** with SLA countdowns, policy copilot, audit trail |
+
+"Viewing as" in the header switches person. Behind the scenes each person gets a signed token, and the API enforces their role, so switching from the officer to the fraud specialist changes what you can approve. Customers only ever see their own requests, in plain language: no reason codes, risk scores or internal queues (`tests/integration/test_portal.py`).
+
+**Try the full loop:**
+1. In the customer portal, report a stolen card.
+2. In the staff workspace, switch to the fraud specialist and approve it.
+3. Back in the portal, the request shows "Action taken: your card has been blocked".
+
+```bash
+# in the cluster: http://localhost:8088 (deploy/k8s-local/up.sh builds and deploys it)
+# or locally, against a local API with demo access on:
+AGENTOPS_DEV_LOGIN=1 uv run uvicorn agentops.api:create_app --factory   # API on :8000
+cd web && npm ci && npm run dev                                         # app on :5173, /api proxied to :8000
+```
+
+`npm run typecheck`, `npm test` and `npm run build` check the app. The Streamlit UI (`ui/app.py`) still works as a minimal client.
+
+### Copilot on Gemini
+
+In the local cluster the copilot and help assistant answer with **Google Gemini** (`gemini-3.5-flash`, minimal thinking: about 1–2 s to first word), through the LiteLLM gateway. Triage stays on the offline model, so the rules pipeline stays deterministic.
+- **Turning it on:** put `GEMINI_API_KEY=...` in the git-ignored `.env` and run `deploy/k8s-local/up.sh`. It copies the key into a Kubernetes Secret that only LiteLLM reads.
+- **If Gemini is down or rate-limited:** the answer falls back to the offline one and says so. The chat shows which model answered.
+- **Free tier:** prompts and answers may be used by Google, so use synthetic data only. Pro models are quota-blocked on the free tier.
+
 ## Running on Kubernetes (local)
 
 Runs the same hardened manifests as EKS on Docker Desktop's built-in cluster (Settings → Kubernetes → Enable), free and offline. [deploy/k8s-local/](deploy/k8s-local/kustomization.yaml) is a Kustomize overlay on the `deploy/k8s` base. It swaps RDS for an in-cluster Postgres StatefulSet, Bedrock for the offline model, the ALB for `port-forward`, and Cognito for dev tokens signed with a random per-cluster secret.
 
 ```bash
 deploy/k8s-local/up.sh      # build agentops:local, create the Secret once, apply, wait for rollout
-deploy/k8s-local/smoke.sh   # 12 checks in the cluster: auth, S1 stolen card end to end, S3 referral, audit
+deploy/k8s-local/smoke.sh   # 19 checks: auth, S1 stolen card, S3 referral, audit, web app through nginx
 kubectl -n agentops port-forward svc/agentops-api 8000:80   # then use the curl demo above
 deploy/k8s-local/down.sh    # delete the namespace (data and secrets included)
 ```
 
 ```text
 namespace agentops (Pod Security: restricted, default-deny NetworkPolicy)
+├── agentops-web     Deployment ×1   nginx + React app on http://localhost:8088 (LoadBalancer), proxies /api
+├── litellm          Deployment ×1   gateway to Gemini; holds the provider key + a random master key
 ├── agentops-api     Deployment ×2   /ready probes (checks the DB), read-only root FS, uid 10001
 ├── agentops-worker  Deployment ×1   SLA timers + crash recovery
 └── postgres         StatefulSet ×1  pgvector, 2 Gi PersistentVolume, reachable only from api + worker
@@ -359,7 +393,8 @@ data/                  synthetic data generator and policy corpus
 evals/                 golden sets, red-team, journeys, and every eval script
 benchmarks/            the same task in PydanticAI and LangGraph
 tests/                 unit, contract, integration, replay
-ui/                    Streamlit client
+web/                   React web app: customer portal + staff workspace (nginx in the cluster)
+ui/                    Streamlit client (minimal)
 deploy/                docker-compose, LiteLLM, Keycloak, CloudFormation, k8s (EKS base), k8s-local (overlay), AWS scripts
 docs/                  structure, ADRs, threat model, SLOs, release, observability, runbooks, eval reports
 ```

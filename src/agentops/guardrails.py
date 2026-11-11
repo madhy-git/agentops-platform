@@ -83,6 +83,33 @@ def detect_injection(text: str) -> bool:
     return any(p.search(text) for p in _INJECTION)
 
 
+# Misuse: someone asking how to get around the bank's own controls. Not an injection (the request is in plain
+# sight), but answering it with "helpful" policy detail hands over the thresholds and routes a fraudster needs.
+_MISUSE = [
+    re.compile(p, re.I)
+    for p in (
+        r"\b(cheat|defraud|swindle|rip ?off|scam|trick|fool|con)\b.{0,30}\b(the )?(bank|system|wattle|staff|fraud team)\b",
+        r"\b(get|go) (a)?round\b.{0,40}\b(approval|check|limit|polic(y|ies)|rule|control|kyc|verification|fraud)",
+        r"\b(bypass|circumvent|evade|dodge|avoid|beat|game)\b.{0,40}\b(approval|check|limit|polic(y|ies)|rule|control|kyc|"
+        r"verification|fraud|detection|system|threshold)",
+        r"\bwithout (getting )?(caught|detected|noticed|flagged)\b",
+        r"\b(fake|forge|falsif(y|ied)|doctor)\b.{0,25}\b(receipt|document|id|identity|payslip|statement|claim|dispute)",
+        r"\blaunder(ing)?\b",
+    )
+]
+
+
+def detect_misuse(text: str) -> bool:
+    """Questions about defeating the bank's controls (cheat, bypass approval, avoid detection, fake documents).
+
+    LEARNING NOTE: deterministic and checked BEFORE retrieval, so nothing is retrieved or sent to the model:
+    a refusal can't be followed by "but here are the rules that apply", which is exactly what the live model
+    did when asked "how can I cheat the bank to get a refund?". Tests in tests/unit/test_guardrails.py cover
+    both the attacks and look-alike innocent questions ("the customer was tricked by a scammer").
+    """
+    return any(p.search(_normalize(text)) for p in _MISUSE)
+
+
 def scan_retrieved(text: str) -> bool:
     """Indirect injection: the attack hides in a *retrieved document* the user never wrote.
 

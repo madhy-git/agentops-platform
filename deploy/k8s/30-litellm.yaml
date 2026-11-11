@@ -30,6 +30,10 @@ spec:
         - name: litellm
           image: ghcr.io/berriai/litellm:main-stable
           args: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
+          # LiteLLM refuses to start without a master key (otherwise anyone who can reach it spends your model
+          # budget). The API presents the same key (10-api.yaml); the secret is created once by deploy.sh.
+          env:
+          - { name: LITELLM_MASTER_KEY, valueFrom: { secretKeyRef: { name: litellm-master, key: LITELLM_MASTER_KEY } } }
           ports: [{ containerPort: 4000 }]
           securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
           resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }

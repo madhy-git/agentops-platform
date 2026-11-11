@@ -37,10 +37,19 @@ class Settings:
     temporal_address: str = "localhost:7233"
     # Phase 4: where the agent's lookup_case tool reads cases from. "static" | "mcp" (mcp_tools.py).
     case_source: str = "static"
+    # Self-service portal: demo sign-in (personas.py). Off unless set; refused anyway when jwt_jwks_url is set.
+    dev_login: bool = False
+    # The copilot's model can be switched to live on its own (AGENTOPS_COPILOT_MODE=live) while triage stays offline:
+    # try a real model where it matters most to users, without changing the rules-driven pipeline or its tests.
+    copilot_mode: str = "offline"
 
     @property
     def live(self) -> bool:
         return self.mode == "live"
+
+    @property
+    def copilot_live(self) -> bool:
+        return self.copilot_mode == "live"
 
 
 def settings() -> Settings:
@@ -59,6 +68,8 @@ def settings() -> Settings:
         db_host=os.getenv("AGENTOPS_DB_HOST"),
         temporal_address=os.getenv("TEMPORAL_ADDRESS", d.temporal_address),
         case_source=os.getenv("AGENTOPS_CASE_SOURCE", d.case_source),
+        dev_login=os.getenv("AGENTOPS_DEV_LOGIN", "") == "1",
+        copilot_mode=os.getenv("AGENTOPS_COPILOT_MODE", os.getenv("AGENTOPS_MODE", d.mode)),
     )
 
 

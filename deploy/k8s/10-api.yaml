@@ -16,6 +16,8 @@ spec:
           args: ["uvicorn", "agentops.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
           ports: [{ containerPort: 8000 }]
           envFrom: [{ configMapRef: { name: agentops-config } }]
+          env:
+          - { name: LITELLM_API_KEY, valueFrom: { secretKeyRef: { name: litellm-master, key: LITELLM_MASTER_KEY } } }
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

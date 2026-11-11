@@ -83,11 +83,14 @@ AuditEventType = Literal[
     "case_state_changed",
     "case_closed",
     "copilot_answered",
+    "dev_login",
+    "misuse_refused",  # copilot declined a "how do I get around the bank's controls" question (guardrails.detect_misuse)  # demo sign-in on the web app (personas.py); never available with a real identity provider
 ]
 
 
 class AuditEvent(BaseModel):
-    schema_version: Literal["1.0"] = "1.0"
+    # 1.1: added "dev_login". 1.2: added "misuse_refused". Both additive: older rows stay valid.
+    schema_version: Literal["1.2"] = "1.2"
     event: AuditEventType
     actor: str = "system"
     ts: datetime | None = None  # set by the database on insert

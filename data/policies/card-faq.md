@@ -2,7 +2,7 @@
 id: POL-FAQ-01
 title: Card and transaction FAQ
 classification: public
-allowed_roles: [staff]
+allowed_roles: [staff, customer]   # customer: shown in the self-service portal assistant
 version: "2026.1"
 ---
 Wattle Bank (fictional). This FAQ answers common questions about cards, fees and statements. Staff may share it with customers.

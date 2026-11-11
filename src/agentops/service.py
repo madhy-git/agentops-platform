@@ -22,7 +22,6 @@ from datetime import datetime
 from typing import Any
 
 from opentelemetry.trace import Span
-from pydantic_ai.exceptions import ModelAPIError, UnexpectedModelBehavior
 from pydantic_ai.models import Model
 
 from . import prompts
@@ -33,7 +32,7 @@ from .contracts import DecisionResult, TriageResult
 from .db import Conn
 from .decision.service import DecisionService, utcnow
 from .guardrails import detect_injection, redact_pii
-from .llm import model_for
+from .llm import PROVIDER_ERRORS, model_for
 from .rag.base import Retriever
 from .rag.memory import KeywordRetriever
 from .resilience import BREAKER, CircuitBreaker
@@ -51,9 +50,6 @@ class AllModelsFailed(RuntimeError):
 # Only failures that a *different model* might fix trigger the fallback. Catching every Exception here
 # once disguised a programming error (PydanticAI's run_sync called inside a running event loop) as a
 # "model outage", twice. Bugs should crash loudly, not quietly cost a tier-3 call.
-PROVIDER_ERRORS: tuple[type[BaseException], ...] = (
-    ModelAPIError, UnexpectedModelBehavior, TimeoutError, ConnectionError, OSError,
-)  # fmt: skip
 
 
 @dataclass

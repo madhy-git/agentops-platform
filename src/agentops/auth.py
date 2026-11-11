@@ -11,6 +11,11 @@ LEARNING NOTES
   token for a different app must be rejected. Keycloak puts the audience in `aud`; Cognito access tokens
   have no `aud` and use `client_id` instead, so both are accepted, but one of them must match.
 - Cognito puts groups in `cognito:groups`; the Cognito user pool's groups are named after APP_ROLES.
+- Customers (self-service portal) carry the `customer` role plus a `customer_id` claim (Cognito: the custom
+  attribute `custom:customer_id`). The API takes "whose data is this?" ONLY from that signed claim, never from
+  a URL or request body, so a customer can't ask for someone else's cases by changing an id (IDOR).
+- A token holding BOTH customer and staff roles is rejected: no legitimate person is both, so it can only be
+  a misconfigured identity provider, and guessing which half to trust is how privilege bugs start.
 """
 
 from __future__ import annotations
@@ -29,14 +34,20 @@ from .config import settings
 AUDIENCE = "agentops-api"  # dev tokens; with a JWKS provider, settings().jwt_audience (Cognito: the app client id)
 APP_ROLES = {
     "viewer", "officer", "manager", "compliance",
-    "fraud_specialist", "hardship_specialist", "disputes_officer",
+    "fraud_specialist", "hardship_specialist", "disputes_officer", "customer",
 }  # fmt: skip
+STAFF_APP_ROLES = APP_ROLES - {"customer"}
 
 
 @dataclass(frozen=True)
 class Principal:
     user: str
     roles: frozenset[str]
+    customer_id: str | None = None  # only for customers; from the signed `customer_id` claim
+
+    @property
+    def is_customer(self) -> bool:
+        return "customer" in self.roles
 
     def has_any(self, *roles: str) -> bool:
         return bool(self.roles & set(roles))
@@ -50,13 +61,17 @@ def principal_from_claims(claims: dict[str, Any]) -> Principal:
         | set(claims.get("roles", []))  # dev tokens
     )
     # Drop provider-internal roles (e.g. Keycloak's "offline_access"): only known app roles count.
-    return Principal(user, frozenset(raw & APP_ROLES))
+    customer_id = claims.get("customer_id") or claims.get("custom:customer_id")
+    return Principal(user, frozenset(raw & APP_ROLES), customer_id=str(customer_id) if customer_id else None)
 
 
-def dev_token(user: str, roles: list[str], ttl_s: int = 3600) -> str:
+def dev_token(user: str, roles: list[str], ttl_s: int = 3600, customer_id: str | None = None) -> str:
     """Mint an HS256 token for local dev and tests. Never enabled when a JWKS URL is configured."""
     now = int(time.time())
-    claims = {"sub": user, "preferred_username": user, "roles": roles, "aud": AUDIENCE, "iat": now, "exp": now + ttl_s}
+    claims: dict[str, Any] = {"sub": user, "preferred_username": user, "roles": roles, "aud": AUDIENCE,
+                              "iat": now, "exp": now + ttl_s}  # fmt: skip
+    if customer_id:
+        claims["customer_id"] = customer_id
     return jwt.encode(claims, settings().jwt_secret, algorithm="HS256")
 
 
@@ -85,6 +100,10 @@ def verify(token: str) -> Principal:
     p = principal_from_claims(claims)
     if not p.roles:
         raise HTTPException(403, "no application roles in token")
+    if p.is_customer and p.roles & STAFF_APP_ROLES:
+        raise HTTPException(403, "token mixes customer and staff roles")
+    if p.is_customer and not p.customer_id:
+        raise HTTPException(403, "customer token has no customer_id")
     return p
 
 

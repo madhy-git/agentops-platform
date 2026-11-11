@@ -15,6 +15,20 @@ from typing import Protocol
 
 # Every staff principal implicitly has "staff"; public documents are readable by "staff".
 STAFF = "staff"
+# Bank customers (self-service portal). They NEVER get the implicit "staff" role: a document is readable by
+# customers only if its front matter lists "customer" explicitly (data/policies/card-faq.md).
+CUSTOMER = "customer"
+
+
+def held_roles(roles: Iterable[str]) -> set[str]:
+    """The roles a caller effectively holds for reading documents: theirs, plus "staff" unless a customer.
+
+    LEARNING NOTE: before the self-service portal, every caller was staff, so retrieval simply did
+    `roles | {"staff"}` in five places. Reusing that for customers would have shown them every internal
+    staff document. One function, used everywhere, makes "who counts as staff" a single decision.
+    """
+    r = set(roles)
+    return r if CUSTOMER in r else r | {STAFF}
 
 
 @dataclass(frozen=True)
@@ -34,4 +48,4 @@ class Retriever(Protocol):
 
 def can_read(allowed_roles: Iterable[str], roles: Iterable[str]) -> bool:
     """Entitlement check shared by every retriever: any overlap between allowed and held roles."""
-    return bool(set(allowed_roles) & ({STAFF} | set(roles)))
+    return bool(set(allowed_roles) & held_roles(roles))
