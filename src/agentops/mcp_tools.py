@@ -39,6 +39,7 @@ def mcp_role(roles: frozenset[str]) -> str:
 
 def mcp_case_lookup(user: str, roles: frozenset[str], profile: str = "wattle") -> Callable[[str], dict[str, Any]]:
     from mcp import Client
+    from mcp.types import TextContent
     from mcp_case_tools.policy import AuditLog, Principal
     from mcp_case_tools.server import build_server
 
@@ -48,7 +49,9 @@ def mcp_case_lookup(user: str, roles: frozenset[str], profile: str = "wattle") -
     async def _get(case_id: str) -> dict[str, Any]:
         async with Client(server) as c:
             r = await c.call_tool("get_case", {"case_id": case_id})
-            text = r.content[0].text  # type: ignore[union-attr]
+            first = r.content[0]
+            # Tools may return images or resources, not only text; only text is expected from get_case.
+            text = first.text if isinstance(first, TextContent) else str(first)
             return {"error": text} if r.is_error else dict(json.loads(text))
 
     def lookup(case_id: str) -> dict[str, Any]:

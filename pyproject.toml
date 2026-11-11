@@ -74,5 +74,7 @@ disallow_untyped_defs = true
 agentops = ["migrations/*.sql"]
 
 [[tool.mypy.overrides]]
-module = ["sklearn.*", "mcp_case_tools.*", "fastembed.*", "pgvector.*", "boto3.*"]
-ignore_missing_imports = true   # these packages ship no type stubs
+module = ["sklearn.*", "mcp", "mcp.*", "mcp_case_tools.*", "fastembed.*", "pgvector.*", "boto3.*"]
+# No type stubs, or (mcp, mcp_case_tools) optional: installed by hand from the sibling repo, not in the lockfile,
+# so CI type-checks without them. Code using them must type-check with AND without the package installed.
+ignore_missing_imports = true
