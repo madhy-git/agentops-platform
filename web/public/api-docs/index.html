@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+  Self-hosted API docs (Swagger UI) for the AgentOps API.
+
+  LEARNING NOTE: FastAPI's built-in /docs page loads Swagger UI from a CDN and starts it with an inline <script>.
+  This site's Content-Security-Policy (web/security-headers.conf) allows neither, so that page rendered blank.
+  Rather than loosen the policy for the whole origin (the docs share it with the staff app and its session token),
+  the Swagger files are bundled into the image (Dockerfile) and started from init.js, a same-origin file.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentOps API docs</title>
+    <link rel="stylesheet" href="./swagger-ui.css" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="./swagger-ui-bundle.js"></script>
+    <script src="./init.js"></script>
+  </body>
+</html>

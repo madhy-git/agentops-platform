@@ -2,8 +2,8 @@
   "description": "What the agent must return. Validation failure => PydanticAI asks the model to retry.",
   "properties": {
     "schema_version": {
-      "const": "1.1",
-      "default": "1.1",
+      "const": "1.2",
+      "default": "1.2",
       "title": "Schema Version",
       "type": "string"
     },
@@ -60,6 +60,13 @@
       },
       "title": "Citations",
       "type": "array"
+    },
+    "rationale": {
+      "default": "",
+      "description": "1-2 sentences: the evidence in the message for this category",
+      "maxLength": 500,
+      "title": "Rationale",
+      "type": "string"
     }
   },
   "required": [

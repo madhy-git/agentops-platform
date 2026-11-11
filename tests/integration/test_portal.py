@@ -56,6 +56,7 @@ def test_customer_cannot_see_another_customers_case(client):
         ("post", "/triage", {"message": "hi"}),
         ("get", "/cases", None),
         ("get", "/cases/1", None),
+        ("get", "/cases/1/ai-trail", None),
         ("post", "/cases/1/transition", {"to": "resolved"}),
         ("get", "/approvals/mine", None),
         ("post", "/approvals/1/decision", {"approve": True}),

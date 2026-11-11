@@ -44,6 +44,10 @@ fi
 k -n "$NS" get secret litellm-master >/dev/null 2>&1 || \
   k -n "$NS" create secret generic litellm-master --from-literal=LITELLM_MASTER_KEY="sk-$(openssl rand -hex 32)" >/dev/null
 
+# Grafana admin password: random, created once. Viewers don't need it (anonymous read-only access).
+k -n "$NS" get secret grafana-admin >/dev/null 2>&1 || \
+  k -n "$NS" create secret generic grafana-admin --from-literal=password="$(openssl rand -hex 16)" >/dev/null
+
 # Gemini key for the LiteLLM gateway, from the git-ignored .env (never from the command line, so it doesn't show
 # up in `ps` or shell history). Re-applied every run, so editing .env and re-running picks up a new key.
 if grep -q '^GEMINI_API_KEY=.' "$ROOT/.env" 2>/dev/null; then
@@ -64,6 +68,9 @@ k -n "$NS" rollout status deploy/agentops-api --timeout=5m
 k -n "$NS" rollout status deploy/agentops-worker --timeout=3m
 k -n "$NS" rollout status deploy/agentops-web --timeout=3m
 k -n "$NS" rollout status deploy/litellm --timeout=5m
+for d in otel-collector jaeger prometheus grafana; do k -n "$NS" rollout status "deploy/$d" --timeout=5m; done
 k -n "$NS" get pods -o wide
 echo
-echo "deployed. Open http://localhost:8088 (web app). Check it: deploy/k8s-local/smoke.sh"
+echo "deployed. Open the UIs (127.0.0.1 only):  deploy/k8s-local/forward.sh"
+echo "  web http://localhost:8088 | grafana http://localhost:3000 | jaeger http://localhost:16686 | postgres 127.0.0.1:5434"
+echo "Check it: deploy/k8s-local/smoke.sh"

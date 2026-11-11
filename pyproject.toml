@@ -19,7 +19,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-otlp = ["opentelemetry-exporter-otlp-proto-http>=1.25"]
+otlp = [
+    "opentelemetry-exporter-otlp-proto-http>=1.25",
+    "opentelemetry-instrumentation-fastapi>=0.66b2",
+    "opentelemetry-instrumentation-psycopg>=0.66b2",
+]
 ui = ["streamlit>=1.38", "httpx>=0.27"]
 aws = ["boto3>=1.35"]
 bench = ["langgraph>=0.2", "langchain-core>=0.3", "langchain-openai>=0.2"]

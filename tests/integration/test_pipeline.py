@@ -116,3 +116,18 @@ def test_circuit_breaker_stops_paying_for_a_dead_tier(conn):
     for _ in range(10):
         assert svc.triage("How do I download my statement?").model_used.tier == 3
     assert len(calls) == 3  # after 3 failures the breaker opens; 7 requests skip tier 2 entirely
+
+
+def test_ai_trail_records_what_the_model_saw_and_why(conn):
+    # The decision trail: redacted input, the full conversation (instructions, tool calls, tool results),
+    # the model's output with its rationale, and the rules decision, all on one append-only row.
+    o = TriageService(conn).triage("My card was stolen, call me on 0411 821 692")
+    t = conn.execute("SELECT * FROM model_traces WHERE case_id = %s", (o.case_id,)).fetchone()
+    assert "[PHONE]" in t["redacted_input"] and "0411" not in str(t["messages"])  # only redacted text is stored
+    kinds = [p["part_kind"] for m in t["messages"] for p in m["parts"]]
+    assert "user-prompt" in kinds and "tool-call" in kinds and "tool-return" in kinds
+    assert any(m.get("instructions") for m in t["messages"]), "the system instructions sent are recorded"
+    assert t["output"]["category"] == "fraud" and '"stolen"' in t["output"]["rationale"]
+    assert "FRAUD_SUSPECTED" in t["decision"]["reason_codes"] and t["prompt_version"] == "1.1.0"
+    with pytest.raises(psycopg.errors.RaiseException):
+        conn.execute("UPDATE model_traces SET output = '{}' WHERE case_id = %s", (o.case_id,))

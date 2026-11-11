@@ -19,6 +19,14 @@ resources:
   - ../k8s
   - postgres.yaml
   - web.yaml
+  - observability.yaml   # OpenTelemetry Collector, Jaeger, Prometheus, Grafana
+
+# The Grafana dashboard is a JSON file in git. The generated ConfigMap's name carries a content hash, so editing
+# the dashboard changes the name, which changes the Grafana pod spec, which rolls Grafana: no stale dashboards.
+configMapGenerator:
+  - name: grafana-dashboards
+    namespace: agentops
+    files: [dashboards/agentops.json]
 
 patches:
   # Settings for local: offline model, DB URL and JWT secret come from the Secret (see the Deployment patches).
@@ -29,6 +37,8 @@ patches:
         value:
           AGENTOPS_MODE: offline
           AGENTOPS_COPILOT_MODE: live
+          OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.agentops.svc.cluster.local:4318
+          OTEL_SERVICE_NAME: agentops-api
           LITELLM_BASE_URL: http://litellm.agentops.svc.cluster.local:4000/v1
           AGENTOPS_DEV_LOGIN: "1"
           HF_HOME: /tmp/hf
@@ -53,6 +63,7 @@ patches:
         value:
           - { name: AGENTOPS_DATABASE_URL, valueFrom: { secretKeyRef: { name: agentops-secrets, key: AGENTOPS_DATABASE_URL } } }
           - { name: PYTHONUNBUFFERED, value: "1" }   # so `kubectl logs` shows each tick as it happens
+          - { name: OTEL_SERVICE_NAME, value: agentops-worker }   # separates worker telemetry from the API's
 
   # AWS-only pieces: removed, not left crash-looping on missing Bedrock / X-Ray / ALB.
   - patch: |-
@@ -69,14 +80,23 @@ patches:
         value: |
           model_list:
             - model_name: agentops-tier1
-              litellm_params: { model: gemini/gemini-3.5-flash-lite, api_key: os.environ/GEMINI_API_KEY }
+              litellm_params: { model: gemini/gemini-3.5-flash-lite, api_key: os.environ/GEMINI_API_KEY, reasoning_effort: minimal }
             # reasoning_effort minimal -> Gemini thinkingLevel "minimal": measured 12 s -> ~2 s to first token for
             # the copilot, same grounded, cited answer. Retrieval already did the "thinking" (which passages matter).
             - model_name: agentops-tier2
               litellm_params: { model: gemini/gemini-3.5-flash, api_key: os.environ/GEMINI_API_KEY, reasoning_effort: minimal }
             - model_name: agentops-tier3
               litellm_params: { model: gemini/gemini-3.5-flash, api_key: os.environ/GEMINI_API_KEY }
-          litellm_settings: { drop_params: true, request_timeout: 60 }
+            # Fallbacks for tier 2. The free tier allows ~20 requests/day PER MODEL (found via a 429 in a Jaeger
+            # trace), so spreading over three models triples the budget. The app's offline answer stays last.
+            - model_name: agentops-tier2-lite
+              litellm_params: { model: gemini/gemini-3.5-flash-lite, api_key: os.environ/GEMINI_API_KEY, reasoning_effort: minimal }
+            - model_name: agentops-tier2-lite-b
+              litellm_params: { model: gemini/gemini-3.1-flash-lite, api_key: os.environ/GEMINI_API_KEY, reasoning_effort: minimal }
+          litellm_settings:
+            drop_params: true
+            request_timeout: 60
+            fallbacks: [{ agentops-tier2: [agentops-tier2-lite, agentops-tier2-lite-b] }]
   - target: { kind: Deployment, name: litellm }
     patch: |-
       - { op: replace, path: /spec/replicas, value: 1 }

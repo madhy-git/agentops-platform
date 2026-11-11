@@ -176,3 +176,44 @@ export type CopilotDone = {
   session_id: string;
   answered_by?: "live" | "offline" | "offline-fallback" | "guardrail" | "referral" | "no_match";
 };
+
+// --- AI decision trail (GET /cases/{id}/ai-trail; staff only) ---------------------------------------------------
+export type TrailPart = {
+  part_kind: "user-prompt" | "tool-call" | "tool-return" | "text" | "system-prompt" | "retry-prompt" | string;
+  content?: unknown;
+  tool_name?: string;
+  args?: unknown;
+};
+export type TrailMessage = { kind: "request" | "response"; instructions?: string | null; parts: TrailPart[]; model_name?: string | null };
+export type AiTrail = {
+  trace: {
+    ts: string;
+    actor: string;
+    trace_id: string | null;
+    prompt_version: string;
+    model: string;
+    route_reason: string | null;
+    failed_models: string[];
+    redacted_input: string;
+    redactions: Record<string, number>;
+    messages: TrailMessage[];
+    output: {
+      category: string;
+      severity: string;
+      summary: string;
+      recommended_action: string;
+      needs_human: boolean;
+      confidence: number;
+      citations: string[];
+      rationale: string;
+    };
+    decision: Decision | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    cost_usd: string | number | null;
+    latency_ms: string | number | null;
+  } | null;
+  rules_fired: { id: string | null; reason_code: string; when: Record<string, unknown> | null; then: Record<string, unknown> | null }[];
+  policy_version: string;
+  audit: AuditEvent[];
+};

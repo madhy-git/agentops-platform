@@ -51,6 +51,7 @@ from .memory import SessionMemory, derived_roles
 from .rag.base import Passage
 from .rag.pg import PgRetriever
 from .router import DEFAULT_MODELS
+from .telemetry import COPILOT_ANSWERS, COPILOT_TTFT, GUARDRAIL_BLOCKS, tracer
 
 MIN_SCORE = 0.60
 MARGIN = 0.05  # keep chunks scoring within 0.05 of the best match (measured gaps: relevant <0.06, off-topic >0.09)
@@ -206,6 +207,7 @@ class Copilot:
         if detect_injection(question):
             ans.text = "I can't help with that request."
             ans.answered_by = "guardrail"
+            GUARDRAIL_BLOCKS.add(1, {"kind": "injection", "surface": "copilot"})
             self.audit.record("injection_blocked", actor=who.user, reason_code="PROMPT_INJECTION", kind="copilot")
             yield ans.text
             yield ans
@@ -213,11 +215,13 @@ class Copilot:
         if detect_misuse(q):  # before retrieval: nothing is looked up, nothing reaches the model
             ans.text = CUSTOMER_MISUSE_REFUSAL if who.is_customer else MISUSE_REFUSAL
             ans.answered_by = "guardrail"
+            GUARDRAIL_BLOCKS.add(1, {"kind": "misuse", "surface": "copilot"})
             self.audit.record("misuse_refused", actor=who.user, reason_code="CONTROL_EVASION", kind="copilot")
             yield ans.text
             yield ans
             return
 
+        retrieve = tracer().start_span("copilot.retrieve")  # timed separately from generation in Jaeger
         hits = self.retriever.search(q, roles=who.roles, k=LIVE_K if self.live else 3)
         # Customers get no "restricted guidance exists" signal: internal documents stay invisible, even as metadata.
         hidden = [] if who.is_customer else self.retriever.hidden_matches(q, who.roles)
@@ -232,6 +236,11 @@ class Copilot:
         hidden_roles = {r for score, roles in hidden if score >= floor for r in roles}
         referral = next((SPECIALIST_QUEUE[r] for r in ("hardship_specialist", "fraud_specialist", "compliance", "manager")
                          if r in hidden_roles), None)  # fmt: skip
+        retrieve.set_attribute("rag.hits", len(hits))
+        retrieve.set_attribute("rag.passages_used", len(passages))
+        retrieve.set_attribute("rag.best_score", round(best, 3))
+        retrieve.set_attribute("rag.referral", referral or "")
+        retrieve.end()
 
         history = self.memory.history(session_id, who.user, who.roles)
         if passages:
@@ -278,6 +287,10 @@ class Copilot:
         allowed = ["customer"] if who.is_customer else derived_roles(passages)
         self.memory.add(session_id, who.user, "user", q, allowed_roles=sorted(who.roles), sources=[])
         self.memory.add(session_id, who.user, "assistant", ans.text, allowed_roles=allowed, sources=ans.sources)
+        audience = "customer" if who.is_customer else "staff"
+        COPILOT_ANSWERS.add(1, {"answered_by": ans.answered_by, "audience": audience})
+        if ans.ttft_ms is not None:
+            COPILOT_TTFT.record(ans.ttft_ms, {"answered_by": ans.answered_by})
         self.audit.record("copilot_answered", actor=who.user, sources=ans.sources, referred_to=referral,
                           ttft_ms=ans.ttft_ms, session_id=session_id, answered_by=ans.answered_by)  # fmt: skip
         yield ans

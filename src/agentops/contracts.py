@@ -29,7 +29,8 @@ Action = Literal["answer", "escalate", "refund_review", "freeze_card", "hardship
 class TriageResult(BaseModel):
     """What the agent must return. Validation failure => PydanticAI asks the model to retry."""
 
-    schema_version: Literal["1.1"] = "1.1"
+    # 1.2: added `rationale` (optional with a default, so 1.1 outputs still validate).
+    schema_version: Literal["1.2"] = "1.2"
     category: Category
     severity: Literal["low", "medium", "high"]
     summary: str = Field(max_length=300)
@@ -38,6 +39,12 @@ class TriageResult(BaseModel):
     # Bounded: a model claiming 1.3 confidence fails validation instead of polluting metrics.
     confidence: float = Field(ge=0.0, le=1.0, description="Model's own confidence in the category, 0-1")
     citations: list[str] = Field(default_factory=list)
+    # The model's own justification, shown to staff in the case's AI decision trail. LEARNING NOTE: this is
+    # what the model SAYS drove its choice, not a guaranteed account of how it computed it. Treat it as a claim
+    # to check against the evidence (the message and the policies it retrieved), which the trail shows next to it.
+    rationale: str = Field(
+        default="", max_length=500, description="1-2 sentences: the evidence in the message for this category"
+    )
 
 
 # --- Decision service (deterministic, Phase 1) --------------------------------------------------

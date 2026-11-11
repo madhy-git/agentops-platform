@@ -9,6 +9,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
+# Self-hosted Swagger UI for /api-docs/ (strict CSP: no CDN scripts). Version pinned in package.json.
+RUN cp node_modules/swagger-ui-dist/swagger-ui-bundle.js node_modules/swagger-ui-dist/swagger-ui.css dist/api-docs/
 
 FROM nginxinc/nginx-unprivileged:1.28.0-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf

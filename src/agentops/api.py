@@ -73,8 +73,10 @@ def _role_for_rules(p: Principal) -> str:
 
 
 def create_app(conn: Conn | None = None) -> FastAPI:
-    conn = conn or db.connect()
+    # Telemetry BEFORE the connection: psycopg instrumentation only wraps connections opened after it's switched
+    # on. The other order (found by looking at the first traces) gave a trace per request but no SQL spans.
     telemetry.init()
+    conn = conn or db.connect()
     # One pod at a time: replicas starting together would otherwise race to migrate and ingest (db.startup_lock).
     with db.startup_lock(conn):
         db.migrate(conn)  # no-op when already applied (tests pass a freshly migrated scratch schema)
@@ -84,6 +86,7 @@ def create_app(conn: Conn | None = None) -> FastAPI:
     svc = TriageService(conn, retriever=retriever)
     copilot = Copilot(conn, retriever=retriever)
     app = FastAPI(title="AgentOps Platform", version="0.4.0")
+    telemetry.instrument_app(app)  # one trace per HTTP request, when an OTLP endpoint is configured
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -207,6 +210,34 @@ def create_app(conn: Conn | None = None) -> FastAPI:
         # Additive: the original case columns stay at the top level, so older clients keep working.
         return {**case, "decision": decision, "approvals": list(approvals), "customer": customer,
                 "allowed_transitions": sorted(TRANSITIONS.get(case["state"], set()))}  # fmt: skip
+
+    @app.get("/cases/{case_id}/ai-trail")
+    def ai_trail(case_id: int, p: Principal = Depends(require(*READ_ROLES))) -> dict[str, Any]:
+        """How the AI and the rules reached this case's outcome. Staff only (customers get 403, see test_portal.py).
+
+        Returns the stored conversation with the model (migration 007), the rules that fired on top of the
+        model's recommendation, and the case's audit events. The audit trail as a whole stays manager/compliance
+        only (/audit); a case's own events are visible to the staff who work that case.
+        """
+        try:
+            svc.cases.get(case_id)
+        except KeyError:
+            raise HTTPException(404, "unknown case") from None
+        trace = conn.execute(
+            "SELECT * FROM model_traces WHERE case_id = %s ORDER BY id DESC LIMIT 1", (case_id,)
+        ).fetchone()
+        fired: list[dict[str, Any]] = []
+        if trace and trace["decision"]:
+            by_code = {r["reason_code"]: r for r in svc.decisions.policy.rules}
+            for code in trace["decision"].get("reason_codes", []):
+                r = by_code.get(code, {})
+                fired.append({"id": r.get("id"), "reason_code": code, "when": r.get("when"), "then": r.get("then")})
+        return {
+            "trace": trace,
+            "rules_fired": fired,
+            "policy_version": svc.decisions.policy.version,
+            "audit": svc.audit.events(str(case_id)),
+        }
 
     def customer_view(customer_id: str) -> dict[str, Any] | None:
         row = conn.execute(

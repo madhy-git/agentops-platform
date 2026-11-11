@@ -168,7 +168,7 @@ All eight phases of [project.md](project.md) have a minimal working version.
 | 6 | AWS | Nested CloudFormation (network, data, identity, app), EKS with Pod Identity, RDS, Cognito, Bedrock, hardened Kubernetes manifests, deploy/destroy/smoke scripts, OIDC deploy workflow | cfn-lint, Checkov, kubeconform, Trivy, shellcheck all pass. **Not deployed** |
 | 7 | Variants | Same task in PydanticAI and LangGraph; rules in OPA/Rego | Rego and Python agree on all 2,000 test inputs |
 
-**Status:** 141 tests (unit, contract, integration, replay, Temporal); ruff and mypy clean; eval gate passing offline. MCP Case Tools: 8 tests.
+**Status:** 159 tests (unit, contract, integration, replay, Temporal); ruff and mypy clean; eval gate passing offline. MCP Case Tools: 8 tests.
 
 ### Scenarios from project.md
 
@@ -339,32 +339,42 @@ In the local cluster the copilot and help assistant answer with **Google Gemini*
 
 ## Running on Kubernetes (local)
 
-Runs the same hardened manifests as EKS on Docker Desktop's built-in cluster (Settings → Kubernetes → Enable), free and offline. [deploy/k8s-local/](deploy/k8s-local/kustomization.yaml) is a Kustomize overlay on the `deploy/k8s` base. It swaps RDS for an in-cluster Postgres StatefulSet, Bedrock for the offline model, the ALB for `port-forward`, and Cognito for dev tokens signed with a random per-cluster secret.
+Runs the same hardened manifests as EKS on Docker Desktop's built-in cluster (Settings → Kubernetes → Enable). [deploy/k8s-local/](deploy/k8s-local/kustomization.yaml) is a Kustomize overlay on the `deploy/k8s` base:
+- **Database:** an in-cluster Postgres StatefulSet instead of RDS.
+- **Models:** Gemini via LiteLLM for the copilot, and the offline model for triage, instead of Bedrock.
+- **Telemetry:** an OpenTelemetry Collector, Jaeger, Prometheus and Grafana instead of ADOT and X-Ray.
+- **Sign-in:** dev tokens signed with a random per-cluster secret, instead of Cognito.
 
 ```bash
-deploy/k8s-local/up.sh      # build agentops:local, create the Secret once, apply, wait for rollout
-deploy/k8s-local/smoke.sh   # 19 checks: auth, S1 stolen card, S3 referral, audit, web app through nginx
-kubectl -n agentops port-forward svc/agentops-api 8000:80   # then use the curl demo above
-deploy/k8s-local/down.sh    # delete the namespace (data and secrets included)
+deploy/k8s-local/up.sh        # build images, create secrets once, apply, wait for rollout
+deploy/k8s-local/forward.sh   # open the UIs on 127.0.0.1 only (self-healing tunnels; Ctrl+C closes them)
+deploy/k8s-local/smoke.sh     # 19 checks: auth, S1 stolen card, S3 referral, audit, web app through nginx
+deploy/k8s-local/down.sh      # delete the namespace (data and secrets included)
 ```
+
+| URL (after `forward.sh`) | What |
+|---|---|
+| http://localhost:8088 | Web app: customer portal + staff workspace |
+| http://localhost:8088/api/docs | **API docs** (Swagger UI, self-hosted: the strict CSP blocks FastAPI's CDN version). Get a token with `POST /auth/dev-login`, then **Authorize** |
+| http://localhost:3000 | **Grafana**: requests, p95 latency, errors, triage by category, copilot sources and time to first token, tokens and spend, guardrail blocks, approvals and escalations |
+| http://localhost:16686 | **Jaeger**: one trace per request (HTTP → retrieval → model call → SQL) |
+| 127.0.0.1:5434 | Postgres + pgvector, for a GUI or `psql` (user `agentops`) |
+
+**Nothing is published to your network.** The tunnels bind 127.0.0.1, and docker-compose ports are bound the same way. An earlier version used a LoadBalancer Service, which Docker Desktop exposes on every interface: the demo sign-in was reachable from the whole Wi-Fi.
 
 ```text
 namespace agentops (Pod Security: restricted, default-deny NetworkPolicy)
-├── agentops-web     Deployment ×1   nginx + React app on http://localhost:8088 (LoadBalancer), proxies /api
-├── litellm          Deployment ×1   gateway to Gemini; holds the provider key + a random master key
+├── agentops-web     Deployment ×1   nginx + React app, proxies /api
 ├── agentops-api     Deployment ×2   /ready probes (checks the DB), read-only root FS, uid 10001
 ├── agentops-worker  Deployment ×1   SLA timers + crash recovery
-└── postgres         StatefulSet ×1  pgvector, 2 Gi PersistentVolume, reachable only from api + worker
+├── litellm          Deployment ×1   gateway to Gemini (with model fallbacks); holds the provider key + a random master key
+├── postgres         StatefulSet ×1  pgvector, 2 Gi PersistentVolume, reachable only from api + worker
+└── otel-collector → jaeger (traces), prometheus → grafana (metrics)
 ```
 
-The scripts refuse cloud contexts (`*eks*`, `arn:aws*`, …); set `KUBE_CONTEXT` for another local cluster (kind is supported). Docker Desktop doesn't enforce NetworkPolicy, so the policies are applied but not tested locally.
+**What observability caught on day one:** the Gemini free tier allows about **20 requests per day per model**. A Jaeger trace showed the copilot's model call failing (HTTP 429), followed by the offline fallback, and the dashboard's "Copilot fallback rate" shows the same thing over time. The fix was a gateway-level fallback across three models, each with its own quota.
 
-Running it found two bugs that the tests had missed, and both would affect EKS:
-
-1. Replicas raced to migrate the database at start-up. Fixed with an advisory lock.
-2. `/health` returned 200 while the pod's database connection was dead. Probes now use `/ready`.
-
-Details are in the tracker's Phase 6 findings.
+The scripts refuse cloud contexts (`*eks*`, `arn:aws*`, …); set `KUBE_CONTEXT` to use another local cluster (kind is supported). Docker Desktop doesn't enforce NetworkPolicy, so the policies are applied but not tested locally.
 
 ## Deploying to AWS
 

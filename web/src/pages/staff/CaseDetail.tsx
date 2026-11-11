@@ -8,7 +8,8 @@ import { ArrowLeft, Flag, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge, Button, Card, ErrorNote, Spinner, stateTone } from "../../components/ui";
-import { post, type CaseDetail as Detail } from "../../lib/api";
+import { AiTrail, AiTrailCard } from "../../components/AiTrail";
+import { post, type AiTrail as Trail, type CaseDetail as Detail } from "../../lib/api";
 import { dateTime, humanize } from "../../lib/format";
 import { useApi } from "../../lib/useApi";
 
@@ -24,6 +25,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function CaseDetail() {
   const { id } = useParams();
   const { data: c, error, loading, reload } = useApi<Detail>(`/cases/${id}`, 10_000);
+  const trail = useApi<Trail>(`/cases/${id}/ai-trail`, 15_000);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
 
@@ -97,6 +99,10 @@ export default function CaseDetail() {
                   </dl>
                 </Card>
               )}
+
+              <AiTrailCard>
+                <AiTrail data={trail.data} error={trail.error} loading={trail.loading} />
+              </AiTrailCard>
 
               <Card className="p-5">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Approvals</h2>

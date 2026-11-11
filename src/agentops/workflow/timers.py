@@ -21,6 +21,7 @@ from typing import Any
 
 from ..audit import AuditLog
 from ..db import Conn
+from ..telemetry import APPROVAL_ESCALATIONS
 from .approvals import ApprovalQueue
 
 
@@ -55,6 +56,7 @@ class TimerWorker:
                 self.audit.record("approval_escalated", case_id=str(r["case_id"]), approval_id=r["id"],
                                   from_user=r["assigned_to"], to_user=manager)  # fmt: skip
                 done["escalated"].append(r["id"])
+                APPROVAL_ESCALATIONS.add(1, {"domain": r["domain"]})
         return done
 
     def _claim(self, sql: str, now: datetime) -> list[dict[str, Any]]:
@@ -62,11 +64,12 @@ class TimerWorker:
 
 
 def main(interval_s: float = 30.0) -> None:  # pragma: no cover - long-running loop
-    from .. import db
+    from .. import db, telemetry
     from ..decision.service import utcnow
     from .actions import ActionExecutor
     from .cases import CaseStore
 
+    telemetry.init()  # traces + metrics (escalations) when OTEL_EXPORTER_OTLP_ENDPOINT is set
     conn = db.connect()
     with db.startup_lock(conn):  # the API pods migrate at start-up too; take turns (db.startup_lock)
         db.migrate(conn)

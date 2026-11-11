@@ -13,6 +13,8 @@
 
 name: agentops
 
+# Every port is published on 127.0.0.1 only: "5433:5432" would expose the database (password: agentops)
+# to the whole network. Docker's default for a bare port mapping is every interface.
 services:
   postgres:
     # pgvector image = stock Postgres + the `vector` extension, so Phase 2 RAG needs no new service.
@@ -21,7 +23,7 @@ services:
       POSTGRES_USER: agentops
       POSTGRES_PASSWORD: agentops   # local-only, synthetic data. Never reuse outside dev.
       POSTGRES_DB: agentops
-    ports: ["5433:5432"]   # 5433 on the host: avoids clashing with a locally installed Postgres on 5432
+    ports: ["127.0.0.1:5433:5432"]   # 5433 on the host: avoids clashing with a locally installed Postgres on 5432
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agentops"]
       interval: 2s
@@ -39,7 +41,7 @@ services:
     env_file: [{ path: ../.env, required: false }]   # provider keys live in .env (git-ignored)
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-dev}
-    ports: ["4000:4000"]
+    ports: ["127.0.0.1:4000:4000"]
 
   keycloak:
     # Phase 4: identity provider. Users log in; the API trusts JWT claims for roles.
@@ -50,20 +52,20 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
     volumes: ["./keycloak:/opt/keycloak/data/import:ro"]
-    ports: ["8080:8080"]
+    ports: ["127.0.0.1:8080:8080"]
 
   jaeger:
     # Receives OpenTelemetry traces over OTLP (4318) and shows them in a UI (16686).
     profiles: [tracing]
     image: jaegertracing/all-in-one:1.62.0
-    ports: ["16686:16686", "4318:4318"]
+    ports: ["127.0.0.1:16686:16686", "127.0.0.1:4318:4318"]
 
   temporal:
     # Phase 5: durable workflows. The dev server keeps state in SQLite inside the container.
     profiles: [temporal]
     image: temporalio/temporal:1.9.1   # Temporal CLI image; `start-dev` runs a single-node dev server
     entrypoint: ["temporal", "server", "start-dev", "--ip", "0.0.0.0"]
-    ports: ["7233:7233", "8233:8233"]
+    ports: ["127.0.0.1:7233:7233", "127.0.0.1:8233:8233"]
 
 volumes:
   pgdata:

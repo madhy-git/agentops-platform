@@ -70,10 +70,17 @@ A=$(curl -sf "$URL/audit" -H "Authorization: Bearer $MGR")
 check "manager reads the audit trail" True "$(echo "$A" | json 'len(d) > 0')"
 
 echo "== web app through nginx (what a browser does)"
-WEB="${WEB:-http://localhost:8088}"
+# Its own tunnel to the web Service (127.0.0.1 only), like the API one above: no dependency on forward.sh.
+k -n "$NS" port-forward --address 127.0.0.1 svc/agentops-web 18088:80 >/dev/null 2>&1 &
+WPF=$!
+trap 'kill $PF $WPF 2>/dev/null || true' EXIT
+for _ in $(seq 1 30); do curl -sf "localhost:18088/healthz" >/dev/null && break; sleep 1; done
+WEB="http://localhost:18088"
 check "web app is served"                   1 "$(curl -s "$WEB/" | grep -c 'id="root"')"
 check "deep links fall back to the app"     200 "$(code "$WEB/portal/requests/1")"
 check "strict Content-Security-Policy set"  1 "$(curl -sI "$WEB/" | grep -ci "content-security-policy: default-src 'self'")"
+check "API docs self-hosted (no CDN)"      200 "$(code "$WEB/api-docs/swagger-ui-bundle.js")"
+check "/api/docs redirects to them"         /api-docs/ "$(curl -s -o /dev/null -w '%{redirect_url}' "$WEB/api/docs" | sed "s#$WEB##")"
 check "/api is proxied to the API"          ready "$(curl -s "$WEB/api/ready" | json 'd["status"]')"
 CTOK=$(curl -sf "$WEB/api/auth/dev-login" -H 'content-type: application/json' -d '{"username":"jordan.brown"}' | json 'd["token"]')
 R=$(curl -sf "$WEB/api/portal/requests" -H "Authorization: Bearer $CTOK" -H 'content-type: application/json' \

@@ -7,7 +7,7 @@ RELEASED maps version -> content hash. When you edit prompts/triage.v1.md:
 
 from agentops import prompts
 
-RELEASED = {"triage": {"1.0.0": "7e4c3d36ad29"}}
+RELEASED = {"triage": {"1.0.0": "7e4c3d36ad29", "1.1.0": "35bcd05e46c1"}}  # 1.1.0: asks for a rationale
 
 
 def test_released_prompt_text_unchanged_for_its_version():

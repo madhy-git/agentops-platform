@@ -89,12 +89,16 @@ def rule_triage(text: str, case: dict[str, Any], policy_hits: list[dict[str, Any
     benchmarks/ so a framework comparison compares frameworks, not two different rule sets."""
     low = text.lower()
     cat, sev, act, human, conf = "general", "low", "answer", False, 0.7
+    rationale = "No fraud, hardship, dispute or complaint keyword found, so treated as a general enquiry."
     for c, words, s, a, h in _RULES:
-        if any(w in low for w in words):
+        hit = next((w for w in words if w in low), None)
+        if hit:
             cat, sev, act, human, conf = c, s, a, h, 0.9
+            rationale = f'The message contains "{hit}", a {c} indicator, so it is triaged as {c} ({s} severity).'
             break
     if case.get("vulnerable"):
         human, act = True, "escalate" if act == "answer" else act
+        rationale += " The linked case is flagged vulnerable, so a human must review it."
     return {
         "category": cat,
         "severity": sev,
@@ -103,6 +107,7 @@ def rule_triage(text: str, case: dict[str, Any], policy_hits: list[dict[str, Any
         "needs_human": human,
         "confidence": conf,
         "citations": [r["source"].split()[0] for r in policy_hits][:2],
+        "rationale": rationale,
     }
 
 

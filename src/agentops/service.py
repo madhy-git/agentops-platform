@@ -37,7 +37,7 @@ from .rag.base import Retriever
 from .rag.memory import KeywordRetriever
 from .resilience import BREAKER, CircuitBreaker
 from .router import ModelSpec, RouteDecision, fallback_chain, route
-from .telemetry import tracer
+from .telemetry import APPROVAL_DECISIONS, GUARDRAIL_BLOCKS, LLM_COST, LLM_TOKENS, TRIAGE_DURATION, TRIAGES, tracer
 from .workflow.actions import ActionExecutor
 from .workflow.approvals import ApprovalQueue
 from .workflow.cases import CaseStore
@@ -101,7 +101,7 @@ class TriageService:
 
     def _run_with_fallback(
         self, text: str, routed: RouteDecision, span: Span, roles: frozenset[str], actor: str = "system"
-    ) -> tuple[TriageResult, ModelSpec, list[str], float]:
+    ) -> tuple[TriageResult, ModelSpec, list[str], float, Any]:
         failed: list[str] = []
         deps = self._deps(actor, roles)
         for spec in fallback_chain(routed):
@@ -131,8 +131,11 @@ class TriageService:
                 # Step 4: cost from measured tokens.
                 cost = (usage.input_tokens + usage.output_tokens) / 1000 * spec.usd_per_1k_tokens
                 run_span.set_attribute("agentops.cost_usd", cost)
+                LLM_TOKENS.add(usage.input_tokens, {"model": spec.name, "direction": "input"})
+                LLM_TOKENS.add(usage.output_tokens, {"model": spec.name, "direction": "output"})
+                LLM_COST.add(cost, {"model": spec.name})
             span.set_attribute("model.used", spec.name)
-            return run.output, spec, failed, cost
+            return run.output, spec, failed, cost, run
         raise AllModelsFailed(f"all models failed: {failed}")
 
     def triage(
@@ -158,12 +161,14 @@ class TriageService:
                     "injection_blocked", actor=actor, case_id=customer_id, reason_code="PROMPT_INJECTION", kind="direct"
                 )
                 span.set_attribute("blocked", True)
+                GUARDRAIL_BLOCKS.add(1, {"kind": "injection", "surface": "triage"})
+                TRIAGES.add(1, {"status": "blocked", "category": "none", "model": "none"})
                 return Outcome("blocked", None, None, red.found, reason="prompt_injection")
 
             # Step 3: route + run. Retrieval runs with the *caller's* entitlements (Phase 2).
             routed = route(red.text, needs_tools=True, budget_tier=self.budget_tier)
             span.set_attribute("model.tier", routed.model.tier)
-            result, used, failed, cost = self._run_with_fallback(red.text, routed, span, roles, actor)
+            result, used, failed, cost, run = self._run_with_fallback(red.text, routed, span, roles, actor)
             self.audit.record(
                 "triaged", actor=actor, case_id=customer_id, category=result.category, severity=result.severity,
                 model=used.name, cost_usd=cost, **pv,
@@ -183,6 +188,7 @@ class TriageService:
             )
             self.cases.transition(case["id"], "in_progress", actor, set(roles), now)
             span.set_attribute("case.id", case["id"])
+            self._record_trace(case["id"], actor, routed, used, failed, red, run, result, decision, cost, started)
             base: dict[str, Any] = dict(
                 model_used=used, failed_models=failed, cost_usd=cost, prompt_version=self.prompt.version,
                 decision=decision, case_id=case["id"],
@@ -195,9 +201,41 @@ class TriageService:
                 self.cases.transition(case["id"], "pending_approval", actor, set(roles), now)
                 span.set_attribute("hitl", True)
                 lat = (time.perf_counter() - started) * 1000
+                self._count(result, used, "pending_approval", lat)
                 return Outcome("pending_approval", result, routed, red.found, req["id"], latency_ms=lat, **base)
             lat = (time.perf_counter() - started) * 1000
+            self._count(result, used, "completed", lat)
             return Outcome("completed", result, routed, red.found, latency_ms=lat, **base)
+
+    @staticmethod
+    def _count(result: TriageResult, used: ModelSpec, status: str, latency_ms: float) -> None:
+        # Low-cardinality labels only (see telemetry.py): category, status and model, never ids or text.
+        TRIAGES.add(1, {"status": status, "category": result.category, "model": used.name})
+        TRIAGE_DURATION.record(latency_ms, {"status": status})
+
+    def _record_trace(
+        self, case_id: int, actor: str, routed: RouteDecision, used: ModelSpec, failed: list[str], red: Any,
+        run: Any, result: TriageResult, decision: DecisionResult, cost: float, started: float,
+    ) -> None:  # fmt: skip
+        """Store the AI decision trail for this case (migration 007): the conversation as sent, plus the outcome."""
+        from opentelemetry import trace as otel
+        from psycopg.types.json import Jsonb
+        from pydantic_ai.messages import ModelMessagesTypeAdapter
+
+        ctx = otel.get_current_span().get_span_context()
+        usage = run.usage
+        self.conn.execute(
+            "INSERT INTO model_traces (case_id, actor, trace_id, prompt_version, model, route_reason, failed_models, "
+            "redacted_input, redactions, messages, output, decision, input_tokens, output_tokens, cost_usd, latency_ms) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (
+                case_id, actor, f"{ctx.trace_id:032x}" if ctx.is_valid else None, self.prompt.version, used.name,
+                routed.reason, Jsonb(failed), red.text, Jsonb(red.found),
+                Jsonb(ModelMessagesTypeAdapter.dump_python(run.all_messages(), mode="json")),
+                Jsonb(result.model_dump(mode="json")), Jsonb(decision.model_dump(mode="json")),
+                usage.input_tokens, usage.output_tokens, cost, round((time.perf_counter() - started) * 1000, 1),
+            ),
+        )  # fmt: skip
 
     def _proposed_action(self, decision: DecisionResult) -> str:
         """The action a human is asked to approve: the first regulated one the rules allowed."""
@@ -212,6 +250,7 @@ class TriageService:
         now = now or utcnow()
         roles = roles or {"manager"}
         req = self.approvals.decide(approval_id, approve, user, roles, now, reason)
+        APPROVAL_DECISIONS.add(1, {"domain": req["domain"], "outcome": "approved" if approve else "rejected"})
         to = "approved" if approve else "rejected"
         self.cases.transition(req["case_id"], to, user, roles, now, approval_id=approval_id)
         if not approve:
