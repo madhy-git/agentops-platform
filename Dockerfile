@@ -17,6 +17,10 @@ RUN /app/.venv/bin/python -c "from agentops.rag.embeddings import LocalEmbedder;
 
 FROM python:3.12-slim
 WORKDIR /app
+# Apply Debian security fixes released after the base image was built. Found when CI's Trivy scan (fail on
+# fixable HIGH/CRITICAL) flagged zlib1g, including a heap overflow, in an otherwise clean image. Rebuilding
+# regularly (Dependabot bumps the base image weekly) keeps this layer small.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --uid 10001 app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /opt/models /opt/models
