@@ -4,7 +4,7 @@
 # - The embedding model is downloaded at BUILD time into /opt/models, so running pods need no internet
 #   access for it and can use a read-only root filesystem (deploy/k8s).
 # - Runs as a non-root user (uid 10001): a container escape lands as an unprivileged account.
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /usr/local/bin/uv
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
@@ -15,7 +15,7 @@ RUN uv sync --locked --no-dev --extra otlp --extra aws
 ENV AGENTOPS_EMBED_CACHE=/opt/models
 RUN /app/.venv/bin/python -c "from agentops.rag.embeddings import LocalEmbedder; LocalEmbedder().embed_query('warm up')"
 
-FROM python:3.12-slim
+FROM python:3.15-slim
 WORKDIR /app
 # Apply Debian security fixes released after the base image was built. Found when CI's Trivy scan (fail on
 # fixable HIGH/CRITICAL) flagged zlib1g, including a heap overflow, in an otherwise clean image. Rebuilding
